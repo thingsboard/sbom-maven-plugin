@@ -1,12 +1,9 @@
 package org.thingsboard.sbom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,20 +12,13 @@ import java.util.Set;
 
 public final class SbomMerger {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
-
     private SbomMerger() {
     }
 
     public static int mergeFile(Path targetFile, Path source, String nestedResource, String hostPurlPrefix) {
-        JsonNode target = SbomSource.readFile(targetFile);
-        JsonNode nested = SbomSource.readResource(source, nestedResource);
-        ObjectNode merged = merge(target, nested, hostPurlPrefix);
-        try {
-            MAPPER.writeValue(targetFile.toFile(), merged);
-        } catch (IOException e) {
-            throw new SbomMergeException("Failed to write " + targetFile, e);
-        }
+        JsonNode target = SbomFiles.readFile(targetFile);
+        JsonNode nested = SbomFiles.readResource(source, nestedResource);
+        SbomFiles.writeFile(targetFile, merge(target, nested, hostPurlPrefix));
         return nested.path("components").size();
     }
 
@@ -58,7 +48,7 @@ public final class SbomMerger {
             if (existing == null) {
                 components.add(component.deepCopy());
             } else if (!existing.equals(component)) {
-                throw new SbomMergeException("Nested component " + ref + " conflicts with a different target component with the same bom-ref");
+                throw new SbomException("Nested component " + ref + " conflicts with a different target component with the same bom-ref");
             }
         }
     }

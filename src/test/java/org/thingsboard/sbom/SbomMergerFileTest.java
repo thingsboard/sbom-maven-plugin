@@ -37,7 +37,7 @@ class SbomMergerFileTest {
         Path source = uiNgxClasses(Boms.npmFixture().toString());
 
         assertThatThrownBy(() -> SbomMerger.mergeFile(target, source, RESOURCE, "pkg:maven/org.thingsboard/missing@"))
-                .isInstanceOf(SbomMergeException.class);
+                .isInstanceOf(SbomException.class);
 
         assertThat(Files.readString(target)).isEqualTo(original);
     }
@@ -48,7 +48,7 @@ class SbomMergerFileTest {
         Path target = Files.writeString(tempDir.resolve("application.cdx.json"), original);
 
         assertThatThrownBy(() -> SbomMerger.mergeFile(target, tempDir, RESOURCE, Boms.HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining(RESOURCE + " not found");
 
         assertThat(Files.readString(target)).isEqualTo(original);
@@ -60,7 +60,7 @@ class SbomMergerFileTest {
         Path source = uiNgxClasses(Boms.npmFixture().toString());
 
         assertThatThrownBy(() -> SbomMerger.mergeFile(target, source, RESOURCE, Boms.HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("SBOM file " + target + " does not exist");
     }
 

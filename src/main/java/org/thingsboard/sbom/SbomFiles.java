@@ -2,6 +2,7 @@ package org.thingsboard.sbom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,21 +11,29 @@ import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-final class SbomSource {
+final class SbomFiles {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    private SbomSource() {
+    private SbomFiles() {
     }
 
     static JsonNode readFile(Path file) {
         if (!Files.isRegularFile(file)) {
-            throw new SbomMergeException("SBOM file " + file + " does not exist");
+            throw new SbomException("SBOM file " + file + " does not exist");
         }
         try {
             return MAPPER.readTree(file.toFile());
         } catch (IOException e) {
-            throw new SbomMergeException("SBOM file " + file + " is not valid JSON", e);
+            throw new SbomException("SBOM file " + file + " is not valid JSON", e);
+        }
+    }
+
+    static void writeFile(Path file, JsonNode bom) {
+        try {
+            MAPPER.writeValue(file.toFile(), bom);
+        } catch (IOException e) {
+            throw new SbomException("Failed to write " + file, e);
         }
     }
 
@@ -37,7 +46,7 @@ final class SbomSource {
             return readFile(file);
         }
         if (!Files.isRegularFile(source)) {
-            throw new SbomMergeException("SBOM source " + source + " does not exist");
+            throw new SbomException("SBOM source " + source + " does not exist");
         }
         try (ZipFile zip = new ZipFile(source.toFile())) {
             ZipEntry entry = zip.getEntry(resource);
@@ -48,12 +57,12 @@ final class SbomSource {
                 return MAPPER.readTree(in);
             }
         } catch (IOException e) {
-            throw new SbomMergeException("Failed to read " + resource + " from " + source, e);
+            throw new SbomException("Failed to read " + resource + " from " + source, e);
         }
     }
 
-    private static SbomMergeException missingResource(Path source, String resource) {
-        return new SbomMergeException(resource + " not found in " + source
+    private static SbomException missingResource(Path source, String resource) {
+        return new SbomException(resource + " not found in " + source
                 + ". Rebuild the module that produces it, or skip the SBOM merge");
     }
 

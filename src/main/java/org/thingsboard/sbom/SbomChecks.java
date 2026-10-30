@@ -110,7 +110,7 @@ final class SbomChecks {
         try {
             errors = new JsonParser().validate(bom, version);
         } catch (IOException e) {
-            throw new SbomMergeException(label + " SBOM could not be validated against the CycloneDX " + specVersion + " schema", e);
+            throw new SbomException(label + " SBOM could not be validated against the CycloneDX " + specVersion + " schema", e);
         }
         check(errors.isEmpty(), label + " SBOM is not valid against the CycloneDX " + specVersion + " schema: "
                 + errors.stream().map(Throwable::getMessage).collect(Collectors.joining("; ")));
@@ -174,7 +174,7 @@ final class SbomChecks {
 
     private static void check(boolean condition, String message) {
         if (!condition) {
-            throw new SbomMergeException(message);
+            throw new SbomException(message);
         }
     }
 

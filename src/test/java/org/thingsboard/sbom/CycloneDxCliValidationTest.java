@@ -30,6 +30,16 @@ class CycloneDxCliValidationTest {
     }
 
     @Test
+    void mergedFixturesWithMetadataPassTheOfficialCliValidation() {
+        ObjectNode merged = SbomMerger.merge(Boms.mavenFixture(), Boms.npmFixture(), Boms.HOST_PREFIX);
+        ObjectNode updated = SbomMetadata.apply(merged, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD);
+
+        CliResult result = validate(updated);
+
+        assertThat(result.passed()).as(result.logs()).isTrue();
+    }
+
+    @Test
     void mergedSyntheticBomsPassTheOfficialCliValidation() {
         ObjectNode merged = SbomMerger.merge(Boms.simpleTarget(), Boms.simpleNested(), Boms.HOST_PREFIX);
 

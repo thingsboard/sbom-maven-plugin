@@ -225,14 +225,14 @@ class SbomMergerTest {
         dependency(target, "b");
 
         assertThatThrownBy(() -> SbomMerger.merge(target, simpleNested(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested component b conflicts");
     }
 
     @Test
     void failsWhenTheHostComponentIsMissing() {
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), simpleNested(), "pkg:maven/org.thingsboard/missing@"))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Expected exactly one target component with purl starting with pkg:maven/org.thingsboard/missing@, found []");
     }
 
@@ -243,14 +243,14 @@ class SbomMergerTest {
         dependency(target, "ui2");
 
         assertThatThrownBy(() -> SbomMerger.merge(target, simpleNested(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("found [ui, ui2]");
     }
 
     @Test
     void failsWhenTheHostPurlPrefixIsBlank() {
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), simpleNested(), " "))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Host purl prefix is blank");
     }
 
@@ -260,7 +260,7 @@ class SbomMergerTest {
         nested.put("specVersion", "1.5");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Spec versions differ: target SBOM is 1.6, nested SBOM is 1.5");
     }
 
@@ -270,7 +270,7 @@ class SbomMergerTest {
         target.put("specVersion", "9.9");
 
         assertThatThrownBy(() -> SbomMerger.merge(target, simpleNested(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Target SBOM has unsupported specVersion '9.9'");
     }
 
@@ -280,14 +280,14 @@ class SbomMergerTest {
         nested.put("bomFormat", "SPDX");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM is not a CycloneDX document");
     }
 
     @Test
     void failsWhenAnInputIsNotAJsonObject() {
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), Boms.MAPPER.createArrayNode(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM is not a JSON object");
     }
 
@@ -297,7 +297,7 @@ class SbomMergerTest {
         ((ObjectNode) nested.get("components").get(0)).remove("name");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM is not valid against the CycloneDX 1.6 schema")
                 .hasMessageContaining("name");
     }
@@ -308,7 +308,7 @@ class SbomMergerTest {
         ((ObjectNode) target.get("metadata").get("component")).remove("bom-ref");
 
         assertThatThrownBy(() -> SbomMerger.merge(target, simpleNested(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Target SBOM has no metadata.component.bom-ref");
     }
 
@@ -318,7 +318,7 @@ class SbomMergerTest {
         ((ObjectNode) nested.get("metadata")).putArray("tools").addObject().put("name", "old-tool");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("legacy metadata.tools array");
     }
 
@@ -328,7 +328,7 @@ class SbomMergerTest {
         component(target, "lib", "pkg:maven/org.example/lib@2.0?type=jar");
 
         assertThatThrownBy(() -> SbomMerger.merge(target, simpleNested(), HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Target SBOM has duplicate component bom-refs: [lib]");
     }
 
@@ -338,7 +338,7 @@ class SbomMergerTest {
         ((ArrayNode) nested.get("dependencies").get(1).get("dependsOn")).add("ghost");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM: a depends on unknown ref ghost");
     }
 
@@ -348,7 +348,7 @@ class SbomMergerTest {
         dependency(nested, "ghost");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM has a dependency entry for unknown ref ghost");
     }
 
@@ -358,7 +358,7 @@ class SbomMergerTest {
         dependency(nested, "b");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM is not valid against the CycloneDX 1.6 schema")
                 .hasMessageContaining("unique");
     }
@@ -369,7 +369,7 @@ class SbomMergerTest {
         dependency(nested, "b", "a");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM has more than one dependency entry for b");
     }
 
@@ -379,7 +379,7 @@ class SbomMergerTest {
         dependency(nested, "npm-root");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM has no components");
     }
 
@@ -389,7 +389,7 @@ class SbomMergerTest {
         ((ObjectNode) nested.get("dependencies").get(0)).remove("dependsOn");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM root npm-root has no direct dependencies");
     }
 
@@ -399,7 +399,7 @@ class SbomMergerTest {
         component(nested, "npm-root", "pkg:npm/npm-root@1.0.0");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested SBOM lists its own root npm-root as a component");
     }
 
@@ -410,7 +410,7 @@ class SbomMergerTest {
         dependency(nested, "orphan");
 
         assertThatThrownBy(() -> SbomMerger.merge(simpleTarget(), nested, HOST_PREFIX))
-                .isInstanceOf(SbomMergeException.class)
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Nested components are not reachable from host component ui: [orphan]");
     }
 

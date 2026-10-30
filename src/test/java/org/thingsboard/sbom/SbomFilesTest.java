@@ -15,7 +15,7 @@ import java.util.zip.ZipOutputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class SbomSourceTest {
+class SbomFilesTest {
 
     private static final String RESOURCE = "META-INF/sbom/ui-ngx.cdx.json";
 
@@ -26,7 +26,7 @@ class SbomSourceTest {
     void readsTheResourceFromAJar() throws IOException {
         Path jar = jar(RESOURCE, Boms.npmFixture().toString());
 
-        JsonNode bom = SbomSource.readResource(jar, RESOURCE);
+        JsonNode bom = SbomFiles.readResource(jar, RESOURCE);
 
         assertThat(bom).isEqualTo(Boms.npmFixture());
     }
@@ -37,7 +37,7 @@ class SbomSourceTest {
         Files.createDirectories(file.getParent());
         Files.writeString(file, Boms.npmFixture().toString());
 
-        JsonNode bom = SbomSource.readResource(tempDir, RESOURCE);
+        JsonNode bom = SbomFiles.readResource(tempDir, RESOURCE);
 
         assertThat(bom).isEqualTo(Boms.npmFixture());
     }
@@ -46,15 +46,15 @@ class SbomSourceTest {
     void failsWhenTheJarHasNoSuchResource() throws IOException {
         Path jar = jar("META-INF/other.json", "{}");
 
-        assertThatThrownBy(() -> SbomSource.readResource(jar, RESOURCE))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readResource(jar, RESOURCE))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining(RESOURCE + " not found in " + jar);
     }
 
     @Test
     void failsWhenTheDirectoryHasNoSuchResource() {
-        assertThatThrownBy(() -> SbomSource.readResource(tempDir, RESOURCE))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readResource(tempDir, RESOURCE))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining(RESOURCE + " not found in " + tempDir);
     }
 
@@ -62,8 +62,8 @@ class SbomSourceTest {
     void failsWhenTheSourceDoesNotExist() {
         Path missing = tempDir.resolve("missing.jar");
 
-        assertThatThrownBy(() -> SbomSource.readResource(missing, RESOURCE))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readResource(missing, RESOURCE))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("SBOM source " + missing + " does not exist");
     }
 
@@ -71,8 +71,8 @@ class SbomSourceTest {
     void failsWhenTheSourceIsNotAZip() throws IOException {
         Path notAJar = Files.writeString(tempDir.resolve("broken.jar"), "not a zip");
 
-        assertThatThrownBy(() -> SbomSource.readResource(notAJar, RESOURCE))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readResource(notAJar, RESOURCE))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Failed to read " + RESOURCE + " from " + notAJar);
     }
 
@@ -80,8 +80,8 @@ class SbomSourceTest {
     void failsWhenTheResourceIsNotJson() throws IOException {
         Path jar = jar(RESOURCE, "{ not json");
 
-        assertThatThrownBy(() -> SbomSource.readResource(jar, RESOURCE))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readResource(jar, RESOURCE))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Failed to read " + RESOURCE + " from " + jar);
     }
 
@@ -89,8 +89,8 @@ class SbomSourceTest {
     void failsWhenTheFileDoesNotExist() {
         Path missing = tempDir.resolve("application.cdx.json");
 
-        assertThatThrownBy(() -> SbomSource.readFile(missing))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readFile(missing))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("SBOM file " + missing + " does not exist");
     }
 
@@ -98,8 +98,8 @@ class SbomSourceTest {
     void failsWhenTheFileIsNotJson() throws IOException {
         Path file = Files.writeString(tempDir.resolve("application.cdx.json"), "{ not json");
 
-        assertThatThrownBy(() -> SbomSource.readFile(file))
-                .isInstanceOf(SbomMergeException.class)
+        assertThatThrownBy(() -> SbomFiles.readFile(file))
+                .isInstanceOf(SbomException.class)
                 .hasMessageContaining("SBOM file " + file + " is not valid JSON");
     }
 

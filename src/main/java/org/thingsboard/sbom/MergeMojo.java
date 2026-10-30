@@ -53,7 +53,7 @@ public class MergeMojo extends AbstractMojo {
         try {
             int merged = SbomMerger.mergeFile(targetFile.toPath(), source.toPath(), nestedResource, "pkg:maven/" + groupId + "/" + artifactId + "@");
             getLog().info("Merged " + merged + " components from " + host + " (" + nestedResource + ") into " + targetFile);
-        } catch (SbomMergeException e) {
+        } catch (SbomException e) {
             throw new MojoFailureException(e.getMessage(), e);
         }
     }
