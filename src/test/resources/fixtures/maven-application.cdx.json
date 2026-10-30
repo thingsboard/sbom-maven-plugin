@@ -1,0 +1,403 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:bd041082-f088-3c09-9855-af60a66fab8b",
+  "version": 1,
+  "metadata": {
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "tools": {
+      "components": [
+        {
+          "type": "library",
+          "author": "OWASP Foundation",
+          "group": "org.cyclonedx",
+          "name": "cyclonedx-maven-plugin",
+          "version": "2.9.3",
+          "description": "CycloneDX Maven plugin",
+          "hashes": [
+            {
+              "alg": "MD5",
+              "content": "e7c87ab327b65b23c681fc9dc8bb620b"
+            },
+            {
+              "alg": "SHA-1",
+              "content": "fa3f0f04f4d5077b5e085d4d09aa2e68aeba5260"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c452d5eebe28bc86bef2e7c72d129f04f60877bef843eac8120f01fb655be293"
+            },
+            {
+              "alg": "SHA-512",
+              "content": "ec0344ed2ffe62d565aaf936a37140d04c7fffa8669a666be0366cd44eec3195232d79841cdec47030b79068216ac7e1a8c805255758e3d418dae32a4b9b9beb"
+            },
+            {
+              "alg": "SHA-384",
+              "content": "3df26b2a00d87fe090851975ebcc30217f98634e7c47d07128e148f325ebfe3bc0790b2f52ad4591734b7b0de738f003"
+            },
+            {
+              "alg": "SHA3-384",
+              "content": "470c1b4962379b5b6494c75bd1475da3519bbe2543999c95f26b4021164d3d05419b0c3f704443162fe5433a204250e9"
+            },
+            {
+              "alg": "SHA3-256",
+              "content": "900e9c4edb18940ed3c4a4ba6946957fa613ef0d4b0c380551638f229206373c"
+            },
+            {
+              "alg": "SHA3-512",
+              "content": "5e36433e18ae24f7460902da27818874df5d1d73df1a97e49e7369335f7cc61ca595466a2d37789fba7eaa7f7f251b29216c3d7a78910b2ec38e2ed68ea84876"
+            }
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:maven/org.thingsboard/application@4.4.1-SNAPSHOT?type=jar",
+      "group": "org.thingsboard",
+      "name": "application",
+      "version": "4.4.1-SNAPSHOT",
+      "description": "ThingsBoard: IoT Platform - Device management, data collection, processing and visualization",
+      "licenses": [
+        {
+          "license": {
+            "id": "BUSL-1.1",
+            "url": "https://mariadb.com/bsl11/"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.thingsboard/application@4.4.1-SNAPSHOT?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://thingsboard.io"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://repo.thingsboard.io/artifactory/libs-release-public"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "maven.goal",
+        "value": "makeBom"
+      },
+      {
+        "name": "maven.scopes",
+        "value": "compile,runtime,system"
+      },
+      {
+        "name": "cdx:reproducible",
+        "value": "enabled"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.thingsboard/ui-ngx@4.4.1-SNAPSHOT?type=jar",
+      "group": "org.thingsboard",
+      "name": "ui-ngx",
+      "version": "4.4.1-SNAPSHOT",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "edf458a66a44050316330b63f6737b1c"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "f140f867499d0f33bf8c6fe94204a742fd909ea7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "888e6b8080b22d2839f31d3d2aaaaf816d8aaf89f4188bb95d79a9879a6e35f5"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "b3fe986c0d8e639c215a7c51bd8ac0c8f59c88fcd65c0ecc3f0bef40b3a94ee4d9d1e91ef4522cbd1d88d2c33a5fcba723b6621820cd4d47de3c9498be111121"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "3c1d86a991b200f2f5ae358e5d60fc66ee79b1f5ffb4491d2c0b3f1726190d3b256ddb4eaf5b5eaf5589d9a919a10ee0"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "cba0ec5073e53f8c3c22491198dc24ce5e5d96baa61ead05a67a354d05a16b5f34946c8273282f68b2ef6a0cc029f59a"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "f1f10f2e9e5a1748b4439adb52b26ddd46b4fe210611bb25aaacb076621efc35"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "e9a53b0324704e25471ad996f560faab8afbe5643c3f04e4c8d71cb28f89787d31c004314a68bc17b1b6b054c115eeeaf1a597904ac79792bb04f505ec548e88"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BUSL-1.1",
+            "url": "https://mariadb.com/bsl11/"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.thingsboard/ui-ngx@4.4.1-SNAPSHOT?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://thingsboard.io"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://repo.thingsboard.io/artifactory/libs-release-public"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+      "publisher": "QOS.ch",
+      "group": "org.slf4j",
+      "name": "slf4j-api",
+      "version": "2.0.18",
+      "description": "The slf4j API",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "fe2837bd49bfb76657419002fed20ca9"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "78a9e7a37cd6360e0b818e86341b24123d28d4df"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "539288fa0c96cea750d11293dbed4c562630587aa7cd88bbf76ad04390d1c40636506da48faa6453090c7e9baa6b690b9fbded55a7e2b4a91547eeea011f971a"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "917885c7812289f5178f68e3c421153d55abd7fe5cc9a071ffdc5de48b7afc79c352c667a20a3ad0f3b4660952932513"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "d6898eb5dd2e5caa2185c6cd2804735802b3848a3041b82ef7faa7904b3eaf5ac382d43a70a71e22b77a929e10ae2aaf"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "6bbc9103bec05ef3280dd895d8c6267ccf8b940df03c9f5145cfaa77f6e9a41a"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "e2913e96e4b1c94e7cb5c46828d1afe68c5a7248293d5c16aaa9ab462ee8e0ff97dd3d1155d2a64f66ccd9bc1ac0c83476cc886b675004b2f84aaaf50e2b2af2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/license/mit/"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://www.slf4j.org"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/slf4j/slf4j-parent/slf4j-api"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar",
+      "publisher": "QOS.ch",
+      "group": "ch.qos.logback",
+      "name": "logback-core",
+      "version": "1.5.38",
+      "description": "logback-core module",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "a065b3893602a19f6f393a42c499c198"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "7b1d133b29bf42ff268cf3f71d1308b80480fb8d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a855a0fc97b1d06f4efb1c3bba5ebd0eb508d8b58e68e89e4bbc23a85135c883"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "c5f73bdfcf4aea58506c4764a05b6992edc628ca54ec6903e56a3d2bf93da7ee5514bcbde1c8ca0ff2d1a164ba92f7354576cf2b7f6a40c3ea8cfa3a865dd396"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "9d3c6f6913b941ef270fd15d355607f4b9e76c621386182e10e83796ff27e6e038736c5ed54a378981e725e91296ef09"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "b649d010518d3dd41b6b568bac744f8cc9220835e34c9a38306efb9cb46f692570dedf9a914d70a1647bd3a95296a6b9"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "5b7610c3dbfaae028f5f0d8c2ddc145803e793a795cd0ed8dfa86c3ca284fef5"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "80d3a5cfa5ce11ec797c26c1cf387676b937942dab5d344559d1f469e6315cb9b55171da4202174671ad416c74ba2fb82f08e198b58f355bf03b97814a340e13"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-2.0",
+            "url": "https://www.eclipse.org/legal/epl-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "LGPL-2.1-only",
+            "url": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1-standalone.html"
+          }
+        }
+      ],
+      "purl": "pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://logback.qos.ch/logback-core"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/logback/logback-core"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
+      "publisher": "QOS.ch",
+      "group": "ch.qos.logback",
+      "name": "logback-classic",
+      "version": "1.5.38",
+      "description": "logback-classic module",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "558314a8784c6dd39cc18670303457cf"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "bc5873cb4a7f502ce18ce2977d98ad26b9f96444"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "afb439c61fa287c9e1925523b13baab03617e724406a389d48b61c2c3e46b700"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "89e69701388d5c859ab2216d240f13afdf502268dfc54782b183b38cb43e34d65657cb7f8d12d269dd351488ce7c59783d6c463fee84b11737a5b886c71b5858"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "21fe0b5a9c06635d0dae42ec40483e3b290d92a7e5199a31296e505b811effa8fc23abc84c9d7ad7d3e98916d03648d4"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "3ebbf60b1411f4cd1b5118c24dd7dc8cf74c98532bd2ba7c56e711aac6e4be0ff031c1dbd29d940eb44e9ff8ebccd18c"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "cbacc14a951204dc09684db550a86ee7e543845a35e7c65fb16bccef078df81f"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "25e5f44f13c7b240fa5acb8e3fb396590b29ed5e287f97586ba5c832f71251cb6787cd902abf6a081616a11af886439b6d9e9239583ff58914b54848e230bd33"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-2.0",
+            "url": "https://www.eclipse.org/legal/epl-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "LGPL-2.1-only",
+            "url": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1-standalone.html"
+          }
+        }
+      ],
+      "purl": "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://logback.qos.ch/logback-classic"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/logback/logback-classic"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:maven/org.thingsboard/application@4.4.1-SNAPSHOT?type=jar",
+      "dependsOn": [
+        "pkg:maven/org.thingsboard/ui-ngx@4.4.1-SNAPSHOT?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+        "pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar",
+        "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"
+      ]
+    },
+    {
+      "ref": "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+    },
+    {
+      "ref": "pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar"
+    },
+    {
+      "ref": "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
+      "dependsOn": [
+        "pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref": "pkg:maven/org.thingsboard/ui-ngx@4.4.1-SNAPSHOT?type=jar"
+    }
+  ]
+}
