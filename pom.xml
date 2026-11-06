@@ -40,6 +40,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
+        <!-- Minimum supported Maven: the oldest version shipped by the last two Ubuntu LTS releases (24.04: 3.8.7, 26.04: 3.9.12). The plugin compiles against it and declares it in <prerequisites>. -->
         <maven-api.version>3.8.7</maven-api.version>
         <maven-plugin-tools.version>3.16.0</maven-plugin-tools.version>
         <cyclonedx-core-java.version>13.4.0</cyclonedx-core-java.version>
