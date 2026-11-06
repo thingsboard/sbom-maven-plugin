@@ -217,7 +217,7 @@ The build fails, and the target file is left untouched, when any of these does n
 ## Building
 
 ```
-mvn verify
+./mvnw verify
 ```
 
 Unit tests validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers); they are skipped when Docker is not available. Integration tests in `src/it` run the plugin together with `cyclonedx-maven-plugin` on small projects.
