@@ -117,6 +117,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Testcontainers and docker-java pull different SLF4J versions into the tests -->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -164,6 +165,13 @@
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-core-java</artifactId>
             <version>${cyclonedx-core-java.version}</version>
+            <exclusions>
+                <!-- Maven provides SLF4J to plugins and never loads a plugin's own copy -->
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.github.package-url</groupId>
