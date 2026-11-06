@@ -277,7 +277,7 @@ class SbomPackageTest {
     void writesTheSbomNextToThePackage() throws IOException {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
 
-        Path output = SbomPackage.writeFor(applicationSbom, "thingsboard", "4.4.0.1", debPackage(), bundled());
+        Path output = SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()).get(0);
 
         assertThat(output).isEqualTo(tempDir.resolve("thingsboard.deb.cdx.json"));
         assertThat(Boms.MAPPER.readTree(output.toFile())).isEqualTo(describeDeb());
@@ -288,7 +288,7 @@ class SbomPackageTest {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         Files.delete(bundle);
 
-        assertThatThrownBy(() -> SbomPackage.writeFor(applicationSbom, "thingsboard", "4.4.0.1", debPackage(), bundled()))
+        assertThatThrownBy(() -> SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()))
                 .isInstanceOf(SbomException.class);
 
         assertThat(tempDir.resolve("thingsboard.deb.cdx.json")).doesNotExist();

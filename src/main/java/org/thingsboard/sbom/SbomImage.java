@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.packageurl.MalformedPackageURLException;
 import com.github.packageurl.PackageURL;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,11 +17,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static org.thingsboard.sbom.SbomChecks.check;
 
 public final class SbomImage {
 
@@ -50,11 +50,11 @@ public final class SbomImage {
     public static ObjectNode describe(JsonNode os, Image image, List<BundledComponent> components) {
         checkImage(image);
         check(components != null && !components.isEmpty(), "No bundled components configured: the image SBOM needs the SBOM of what the image installs");
-        BundledComponents.check(components, BundledComponents.Goal.IMAGE);
+        BundledComponents.validate(components, BundledComponents.Goal.IMAGE);
         SbomChecks.checkInput("OS", os);
         String specVersion = os.path("specVersion").asText();
         List<Bundled> included = components.stream()
-                .map(component -> new Bundled(component, SbomPackage.resolve(component, specVersion)))
+                .map(component -> new Bundled(component, BundledComponents.resolve(component, specVersion)))
                 .toList();
 
         String rootRef = image.purl();
@@ -64,35 +64,26 @@ public final class SbomImage {
         claimScannedPackages(os, included, replaced);
         included.forEach(Bundled::dropNotInstalled);
 
-        Map<String, String> osPurls = new HashMap<>();
-        componentStream(os)
-                .filter(osComponent -> !replaced.containsKey(osComponent.path("bom-ref").asText()))
-                .forEach(osComponent -> osPurls.put(withoutQualifiers(osComponent.path("purl").asText()), osComponent.path("bom-ref").asText()));
-        osPurls.remove("");
+        List<JsonNode> keptOs = componentStream(os).filter(osComponent -> !replaced.containsKey(osComponent.path("bom-ref").asText())).toList();
+        Set<String> osPurls = keptOs.stream().map(SbomImage::purlOf).filter(purl -> !purl.isEmpty()).collect(Collectors.toSet());
         Set<String> overlap = new LinkedHashSet<>();
         for (Bundled component : included) {
             if (component.dir() == null) {
-                component.purls().stream().filter(osPurls::containsKey).forEach(overlap::add);
+                component.purls().stream().filter(osPurls::contains).forEach(overlap::add);
             }
         }
         check(overlap.isEmpty(), "The OS SBOM also lists components that come from the bundled SBOMs: " + overlap
                 + "; exclude the directories the bundled packages install to from the OS scan");
 
-        ObjectNode bom = JsonNodeFactory.instance.objectNode();
-        bom.put("bomFormat", "CycloneDX");
-        bom.put("specVersion", specVersion);
-        bom.put("serialNumber", "urn:uuid:" + UUID.nameUUIDFromBytes(("image:" + rootRef).getBytes(StandardCharsets.UTF_8)));
-        bom.put("version", 1);
+        ObjectNode bom = SbomJson.newBom(specVersion, "image:" + rootRef);
         bom.set("metadata", metadata(os, included, image, rootRef));
 
         ArrayNode bomComponents = bom.putArray("components");
         Map<String, JsonNode> componentsByRef = new LinkedHashMap<>();
-        componentStream(os)
-                .filter(osComponent -> !replaced.containsKey(osComponent.path("bom-ref").asText()))
-                .forEach(osComponent -> add(bomComponents, componentsByRef, osComponent, "the OS SBOM"));
+        keptOs.forEach(osComponent -> SbomJson.addComponent(bomComponents, componentsByRef, osComponent, "the OS SBOM"));
         for (Bundled component : included) {
-            add(bomComponents, componentsByRef, component.json(), "the bundled components");
-            component.nested().forEach(nested -> add(bomComponents, componentsByRef, nested, "the SBOM of " + component.ref()));
+            SbomJson.addComponent(bomComponents, componentsByRef, component.json(), "the bundled components");
+            component.nested().forEach(nested -> SbomJson.addComponent(bomComponents, componentsByRef, nested, "the SBOM of " + component.ref()));
             if (component.sbom() != null) {
                 SbomMerger.mergeTools(bom, component.sbom());
             }
@@ -115,59 +106,54 @@ public final class SbomImage {
             });
         }
         Set<String> rootDependsOn = graph.computeIfAbsent(rootRef, key -> new LinkedHashSet<>());
-        componentStream(os)
+        keptOs.stream()
                 .map(osComponent -> osComponent.path("bom-ref").asText())
-                .filter(ref -> !replaced.containsKey(ref) && !osTargets.contains(ref))
+                .filter(ref -> !osTargets.contains(ref))
                 .forEach(rootDependsOn::add);
         for (Bundled component : included) {
             rootDependsOn.add(component.ref());
             component.dependencies().forEach((ref, targets) -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()).addAll(targets));
         }
-        Set<String> reachableFromRoot = SbomPackage.reachableFrom(rootRef, graph);
+        Set<String> reachable = SbomChecks.reachableFrom(rootRef, graph);
         for (String ref : osTargets) {
-            if (componentsByRef.containsKey(ref) && !reachableFromRoot.contains(ref)) {
+            if (componentsByRef.containsKey(ref) && !reachable.contains(ref)) {
                 rootDependsOn.add(ref);
-                reachableFromRoot.addAll(SbomPackage.reachableFrom(ref, graph));
+                SbomChecks.reachableFrom(ref, graph, reachable);
             }
         }
         componentsByRef.keySet().forEach(ref -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()));
-        ArrayNode dependencies = bom.putArray("dependencies");
-        graph.forEach((ref, targets) -> {
-            ObjectNode entry = dependencies.addObject().put("ref", ref);
-            if (!targets.isEmpty()) {
-                ArrayNode dependsOn = entry.putArray("dependsOn");
-                targets.forEach(dependsOn::add);
-            }
-        });
+        SbomJson.putDependencies(bom, graph);
 
         SbomChecks.checkInput("Image", bom);
-        Set<String> reachable = SbomPackage.reachableFrom(rootRef, SbomPackage.dependencyGraph(bom));
-        Set<String> unreachable = componentsByRef.keySet().stream()
-                .filter(ref -> !reachable.contains(ref))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> unreachable = SbomChecks.unreachable(componentsByRef.keySet(), reachable);
         check(unreachable.isEmpty(), "Image SBOM components are not reachable from the image: " + unreachable);
         return bom;
     }
 
     private static void replaceOsPackages(JsonNode os, List<Bundled> included, Map<String, String> replaced) {
+        Map<String, List<ScannedPackage>> scannedByName = null;
         for (Bundled component : included) {
             PackageURL purl = parsePurl(component.json().path("purl").asText());
             if (component.config().getFile() == null || purl == null || !OS_PACKAGE_TYPES.contains(purl.getType())) {
                 continue;
             }
-            List<JsonNode> matches = componentStream(os)
-                    .filter(osComponent -> {
-                        PackageURL scanned = parsePurl(osComponent.path("purl").asText());
-                        return scanned != null && purl.getType().equals(scanned.getType()) && purl.getName().equals(scanned.getName());
-                    })
-                    .toList();
+            if (scannedByName == null) {
+                scannedByName = componentStream(os)
+                        .map(osComponent -> new ScannedPackage(osComponent.path("bom-ref").asText(), parsePurl(osComponent.path("purl").asText())))
+                        .filter(scanned -> scanned.purl() != null)
+                        .collect(Collectors.groupingBy(scanned -> scanned.purl().getType() + "/" + scanned.purl().getName()));
+            }
+            List<ScannedPackage> matches = scannedByName.getOrDefault(purl.getType() + "/" + purl.getName(), List.of());
             check(matches.size() == 1, "The OS SBOM should list " + purl.getName() + " as one installed " + purl.getType() + " package, but lists it "
                     + matches.size() + " times; check that the image installs the package the SBOM was built for");
-            String scannedVersion = parsePurl(matches.get(0).path("purl").asText()).getVersion();
+            String scannedVersion = matches.get(0).purl().getVersion();
             check(Objects.equals(purl.getVersion(), scannedVersion), "The image installs " + purl.getName() + " " + scannedVersion + ", but the SBOM of "
                     + component.ref() + " is for " + purl.getVersion() + "; check that the image installs the package the SBOM was built for");
-            replaced.put(matches.get(0).path("bom-ref").asText(), component.ref());
+            replaced.put(matches.get(0).ref(), component.ref());
         }
+    }
+
+    private record ScannedPackage(String ref, PackageURL purl) {
     }
 
     private static PackageURL parsePurl(String purl) {
@@ -189,7 +175,7 @@ public final class SbomImage {
                     .filter(component -> location.startsWith(component.dir() + "/"))
                     .max(Comparator.comparingInt(component -> component.dir().length()))
                     .ifPresent(owner -> replaced.put(osComponent.path("bom-ref").asText(),
-                            owner.claim(location.substring(owner.dir().length() + 1), withoutQualifiers(osComponent.path("purl").asText()), location)));
+                            owner.claim(location.substring(owner.dir().length() + 1), purlOf(osComponent), location)));
         });
     }
 
@@ -205,14 +191,16 @@ public final class SbomImage {
     private static final class Bundled {
 
         private final BundledComponent config;
-        private final SbomPackage.Resolved resolved;
+        private final BundledComponents.Resolved resolved;
         private final Map<String, JsonNode> nestedByRef = new LinkedHashMap<>();
         private final Map<String, String> refByPath = new LinkedHashMap<>();
         private final Map<String, List<String>> pathsByRef = new LinkedHashMap<>();
+        private final Map<String, String> refByPurl = new HashMap<>();
+        private final Map<String, String> otherPlatformRefByPurl = new HashMap<>();
         private final Map<String, Set<String>> installedAt = new LinkedHashMap<>();
         private final Set<String> dropped = new LinkedHashSet<>();
 
-        Bundled(BundledComponent config, SbomPackage.Resolved resolved) {
+        Bundled(BundledComponent config, BundledComponents.Resolved resolved) {
             this.config = config;
             this.resolved = resolved;
             if (resolved.sbom() != null) {
@@ -226,6 +214,20 @@ public final class SbomImage {
                         pathsByRef.computeIfAbsent(ref, key -> new ArrayList<>()).add(property.path("value").asText());
                     }
                 }));
+                nestedByRef.forEach((ref, nested) -> {
+                    if (optional(nested) && !pathsByRef.containsKey(ref)) {
+                        putPurl(otherPlatformRefByPurl, nested, ref);
+                    }
+                });
+            }
+            putPurl(refByPurl, resolved.json(), resolved.ref());
+            nestedByRef.forEach((ref, nested) -> putPurl(refByPurl, nested, ref));
+        }
+
+        private static void putPurl(Map<String, String> refs, JsonNode component, String ref) {
+            String purl = purlOf(component);
+            if (!purl.isEmpty()) {
+                refs.putIfAbsent(purl, ref);
             }
         }
 
@@ -251,7 +253,7 @@ public final class SbomImage {
 
         String claim(String relative, String purl, String location) {
             check(!purl.isEmpty(), "The image has a component without a purl at " + location + ", so it cannot be checked against the SBOM of " + ref());
-            String ref = config.getBundleDir() != null ? listedRef(purl) : installedRef(packagePath(relative), purl, location);
+            String ref = config.getBundleDir() != null ? refByPurl.get(purl) : installedRef(packagePath(relative), purl, location);
             check(ref != null, "The image has " + purl + " at " + location + ", which the SBOM of " + ref() + " does not list");
             return ref;
         }
@@ -259,35 +261,15 @@ public final class SbomImage {
         private String installedRef(String path, String purl, String location) {
             String ref = refByPath.get(path);
             if (ref != null) {
-                check(path.equals(".") || purl.equals(withoutQualifiers(nestedByRef.get(ref).path("purl").asText())),
+                check(path.equals(".") || purl.equals(purlOf(nestedByRef.get(ref))),
                         "The image has " + purl + " at " + location + ", but the SBOM of " + ref() + " lists " + ref + " there");
             } else {
-                ref = otherPlatformRef(purl);
+                ref = otherPlatformRefByPurl.get(purl);
             }
             if (ref != null) {
                 installedAt.computeIfAbsent(ref, key -> new LinkedHashSet<>()).add(path);
             }
             return ref;
-        }
-
-        private String listedRef(String purl) {
-            if (purl.equals(withoutQualifiers(json().path("purl").asText()))) {
-                return ref();
-            }
-            return nestedByRef.entrySet().stream()
-                    .filter(entry -> purl.equals(withoutQualifiers(entry.getValue().path("purl").asText())))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        private String otherPlatformRef(String purl) {
-            return nestedByRef.entrySet().stream()
-                    .filter(entry -> optional(entry.getValue()) && !pathsByRef.containsKey(entry.getKey()))
-                    .filter(entry -> purl.equals(withoutQualifiers(entry.getValue().path("purl").asText())))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElse(null);
         }
 
         private static String packagePath(String relative) {
@@ -346,8 +328,8 @@ public final class SbomImage {
 
         Set<String> purls() {
             Set<String> purls = new LinkedHashSet<>();
-            purls.add(withoutQualifiers(json().path("purl").asText()));
-            nested().forEach(nested -> purls.add(withoutQualifiers(nested.path("purl").asText())));
+            purls.add(purlOf(json()));
+            nested().forEach(nested -> purls.add(purlOf(nested)));
             purls.remove("");
             return purls;
         }
@@ -371,42 +353,20 @@ public final class SbomImage {
                 .findFirst()
                 .map(sbom -> sbom.path("metadata"))
                 .orElse(JsonNodeFactory.instance.objectNode());
-        if (bundledMetadata.has("lifecycles")) {
-            metadata.set("lifecycles", bundledMetadata.get("lifecycles").deepCopy());
-        }
-        if (os.path("metadata").has("tools")) {
-            metadata.set("tools", os.path("metadata").get("tools").deepCopy());
-        }
+        SbomJson.copyFields(bundledMetadata, metadata, "lifecycles");
+        SbomJson.copyFields(os.path("metadata"), metadata, "tools");
         int slash = image.repository().indexOf('/');
         ObjectNode root = metadata.putObject("component");
         root.put("type", "container");
         root.put("bom-ref", rootRef);
-        if (bundledMetadata.path("component").has("manufacturer")) {
-            root.set("manufacturer", bundledMetadata.path("component").get("manufacturer").deepCopy());
-        }
+        SbomJson.copyFields(bundledMetadata.path("component"), root, "manufacturer");
         root.put("group", image.repository().substring(0, slash));
         root.put("name", image.repository().substring(slash + 1));
         root.put("version", image.tag());
-        root.putArray("hashes").addObject().put("alg", "SHA-256").put("content", image.digest().substring("sha256:".length()));
+        root.set("hashes", SbomJson.hashesJson(Map.of("SHA-256", image.digest().substring("sha256:".length()))));
         root.put("purl", rootRef);
-        for (String field : List.of("manufacturer", "supplier")) {
-            if (bundledMetadata.has(field)) {
-                metadata.set(field, bundledMetadata.get(field).deepCopy());
-            }
-        }
+        SbomJson.copyFields(bundledMetadata, metadata, "manufacturer", "supplier");
         return metadata;
-    }
-
-    private static void add(ArrayNode bomComponents, Map<String, JsonNode> componentsByRef, JsonNode component, String source) {
-        String ref = component.path("bom-ref").asText();
-        JsonNode known = componentsByRef.get(ref);
-        if (known == null) {
-            bomComponents.add(component.deepCopy());
-            componentsByRef.put(ref, component);
-            return;
-        }
-        check(SbomPackage.sameComponent(known, component),
-                "Component " + ref + " from " + source + " clashes with a different component that is already in the SBOM");
     }
 
     private static Stream<JsonNode> componentStream(JsonNode bom) {
@@ -417,21 +377,8 @@ public final class SbomImage {
         return replaced.getOrDefault(ref, ref);
     }
 
-    private static String withoutQualifiers(String purl) {
-        int end = purl.length();
-        for (char separator : new char[]{'?', '#'}) {
-            int index = purl.indexOf(separator);
-            if (index >= 0 && index < end) {
-                end = index;
-            }
-        }
-        return purl.substring(0, end);
-    }
-
-    private static void check(boolean condition, String message) {
-        if (!condition) {
-            throw new SbomException(message);
-        }
+    private static String purlOf(JsonNode component) {
+        return component.path("purl").asText().split("[?#]", 2)[0];
     }
 
 }

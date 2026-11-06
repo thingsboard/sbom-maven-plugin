@@ -43,7 +43,7 @@ class SbomImageTest {
     void createPackage() throws IOException {
         deb = Files.writeString(tempDir.resolve("tb-mqtt-transport.deb"), "deb contents");
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
-        packageSbom = SbomPackage.writeFor(applicationSbom, "tb-mqtt-transport", "4.4.1", new PackageFile("deb", deb.toFile(), DEB_PURL, false), List.of());
+        packageSbom = SbomPackage.writeAll(applicationSbom, "tb-mqtt-transport", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of()).get(0);
     }
 
     static ObjectNode osSbom() {
@@ -317,7 +317,7 @@ class SbomImageTest {
     @Test
     void thePackageIsMatchedByThePurlNameNotTheComponentName() throws IOException {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
-        SbomPackage.writeFor(applicationSbom, "mqtt", "4.4.1", new PackageFile("deb", deb.toFile(), DEB_PURL, false), List.of());
+        SbomPackage.writeAll(applicationSbom, "mqtt", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of());
 
         JsonNode described = describe();
 

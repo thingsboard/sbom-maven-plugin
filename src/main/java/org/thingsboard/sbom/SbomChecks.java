@@ -8,9 +8,11 @@ import org.cyclonedx.parsers.JsonParser;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -82,8 +84,7 @@ final class SbomChecks {
         check(!hostDependsOn.isEmpty() && hostDependsOn.containsAll(nestedRootDependsOn),
                 "Host component " + hostRef + " does not depend on the direct dependencies of the nested root");
 
-        Set<String> reachable = reachableFrom(hostRef, mergedDependencies);
-        Set<String> unreachable = componentRefs(nested).stream().filter(ref -> !reachable.contains(ref)).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> unreachable = unreachable(componentRefs(nested), reachableFrom(hostRef, dependencyGraph(merged)));
         check(unreachable.isEmpty(), "Nested components are not reachable from host component " + hostRef + ": " + unreachable);
     }
 
@@ -95,6 +96,48 @@ final class SbomChecks {
 
     static String rootRef(JsonNode bom) {
         return bom.path("metadata").path("component").path("bom-ref").asText();
+    }
+
+    static void checkPurl(String label, String purl) {
+        check(purl != null && !purl.isBlank(), label + " has no purl");
+        check(purl.startsWith("pkg:") && purl.indexOf('/') > 4, label + " has an invalid purl " + purl);
+    }
+
+    static Map<String, Set<String>> dependencyGraph(JsonNode bom) {
+        return addDependencies(new LinkedHashMap<>(), bom);
+    }
+
+    static Map<String, Set<String>> addDependencies(Map<String, Set<String>> graph, JsonNode bom) {
+        for (JsonNode dependency : bom.path("dependencies")) {
+            Set<String> targets = graph.computeIfAbsent(dependency.path("ref").asText(), ref -> new LinkedHashSet<>());
+            dependency.path("dependsOn").forEach(target -> targets.add(target.asText()));
+        }
+        return graph;
+    }
+
+    static Set<String> reachableFrom(String start, Map<String, Set<String>> graph) {
+        return reachableFrom(start, graph, new HashSet<>());
+    }
+
+    static Set<String> reachableFrom(String start, Map<String, Set<String>> graph, Set<String> reachable) {
+        Deque<String> queue = new ArrayDeque<>(List.of(start));
+        while (!queue.isEmpty()) {
+            String ref = queue.pop();
+            if (reachable.add(ref)) {
+                queue.addAll(graph.getOrDefault(ref, Set.of()));
+            }
+        }
+        return reachable;
+    }
+
+    static Set<String> unreachable(Collection<String> refs, Set<String> reachable) {
+        return refs.stream().filter(ref -> !reachable.contains(ref)).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    static void check(boolean condition, String message) {
+        if (!condition) {
+            throw new SbomException(message);
+        }
     }
 
     private static void checkSchema(String label, JsonNode bom) {
@@ -158,24 +201,6 @@ final class SbomChecks {
             dependency.path("dependsOn").forEach(ref -> refs.add(ref.asText()));
         }
         return refs;
-    }
-
-    private static Set<String> reachableFrom(String start, Map<String, JsonNode> dependencies) {
-        Set<String> reachable = new HashSet<>();
-        Deque<String> queue = new ArrayDeque<>(List.of(start));
-        while (!queue.isEmpty()) {
-            String ref = queue.pop();
-            if (reachable.add(ref)) {
-                queue.addAll(dependsOn(dependencies.get(ref)));
-            }
-        }
-        return reachable;
-    }
-
-    private static void check(boolean condition, String message) {
-        if (!condition) {
-            throw new SbomException(message);
-        }
     }
 
 }
