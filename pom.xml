@@ -33,19 +33,20 @@
     </scm>
 
     <prerequisites>
-        <maven>3.9.0</maven>
+        <maven>${maven-api.version}</maven>
     </prerequisites>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
-        <maven.version>3.10.0</maven.version>
+        <maven-api.version>3.8.7</maven-api.version>
         <maven-plugin-tools.version>3.16.0</maven-plugin-tools.version>
         <cyclonedx-core-java.version>13.4.0</cyclonedx-core-java.version>
         <packageurl-java.version>1.5.0</packageurl-java.version>
         <jackson.version>2.22.4</jackson.version>
         <slf4j.version>2.0.20</slf4j.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <junit.version>6.1.3</junit.version>
         <assertj.version>3.27.7</assertj.version>
         <testcontainers.version>2.0.5</testcontainers.version>
@@ -75,6 +76,12 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
+            <!-- maven-core < 3.9.8 (provided, so also on the test classpath) brings an old commons-lang3 that would shadow the one Testcontainers needs; remove once maven-api.version >= 3.9.8 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -82,13 +89,13 @@
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
-            <version>${maven.version}</version>
+            <version>${maven-api.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-core</artifactId>
-            <version>${maven.version}</version>
+            <version>${maven-api.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
