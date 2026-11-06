@@ -1,0 +1,50 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "group": "@cyclonedx",
+          "name": "cyclonedx-npm",
+          "version": "6.0.1"
+        }
+      ]
+    },
+    "component": {
+      "type": "library",
+      "bom-ref": "pkg:github/example/widget@0123456789abcdef0123456789abcdef01234567",
+      "name": "widget",
+      "version": "0123456789abcdef0123456789abcdef01234567",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cbb2ee1776b00e426da7112fa7b7238acd9ae8095dff2be29abaf7a61eebdcd2"
+        }
+      ],
+      "purl": "pkg:github/example/widget@0123456789abcdef0123456789abcdef01234567"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/charts@1.0.0",
+      "name": "charts",
+      "version": "1.0.0",
+      "purl": "pkg:npm/charts@1.0.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:github/example/widget@0123456789abcdef0123456789abcdef01234567",
+      "dependsOn": [
+        "pkg:npm/charts@1.0.0"
+      ]
+    },
+    {
+      "ref": "pkg:npm/charts@1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.example.it</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0</version>
+    <packaging>pom</packaging>
+    <properties>
+        <chromium.version>156.0.8078.4</chromium.version>
+    </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>@project.groupId@</groupId>
+                <artifactId>@project.artifactId@</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>image-sbom</id>
+                        <goals>
+                            <goal>image</goal>
+                        </goals>
+                        <configuration>
+                            <osSbom>${project.basedir}/data/os-${sbom.image.architecture}.cdx.json</osSbom>
+                            <repository>example/app</repository>
+                            <outputFile>${project.build.directory}/sbom/image-${sbom.image.architecture}.cdx.json</outputFile>
+                            <components>
+                                <component>
+                                    <sbom>${project.basedir}/data/app.cdx.json</sbom>
+                                    <installDir>/usr/share/app</installDir>
+                                </component>
+                                <component>
+                                    <sbom>${project.basedir}/data/ui.cdx.json</sbom>
+                                    <bundleDir>/usr/share/app/web</bundleDir>
+                                </component>
+                                <component>
+                                    <type>application</type>
+                                    <name>chrome-for-testing</name>
+                                    <version>${chromium.version}</version>
+                                    <purl>pkg:generic/google/chrome-for-testing@${chromium.version}?os=linux&amp;arch=${sbom.image.architecture}</purl>
+                                </component>
+                            </components>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

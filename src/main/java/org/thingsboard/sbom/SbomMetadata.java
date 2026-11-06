@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.thingsboard.sbom.SbomChecks.check;
+import static org.thingsboard.sbom.SbomJson.putIfPresent;
+
 public final class SbomMetadata {
 
     private static final BigDecimal MIN_SPEC_VERSION = new BigDecimal("1.6");
@@ -48,7 +51,7 @@ public final class SbomMetadata {
         return updated;
     }
 
-    private static ObjectNode toJson(String label, Organization organization) {
+    static ObjectNode toJson(String label, Organization organization) {
         check(organization.getName() != null && !organization.getName().isBlank(), label + " has no name");
         ObjectNode json = JsonNodeFactory.instance.objectNode().put("name", organization.getName());
         if (!organization.getUrls().isEmpty()) {
@@ -69,12 +72,6 @@ public final class SbomMetadata {
             }
         }
         return json;
-    }
-
-    private static void putIfPresent(ObjectNode json, String field, String value) {
-        if (value != null && !value.isBlank()) {
-            json.put(field, value);
-        }
     }
 
     private static JsonNode withoutManagedFields(JsonNode bom) {
@@ -101,12 +98,6 @@ public final class SbomMetadata {
             fields.add("metadata.component.manufacturer");
         }
         return fields;
-    }
-
-    private static void check(boolean condition, String message) {
-        if (!condition) {
-            throw new SbomException(message);
-        }
     }
 
 }

@@ -1,0 +1,35 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.example.it/ui@1.0",
+      "name": "ui",
+      "group": "org.example.it",
+      "version": "1.0",
+      "purl": "pkg:maven/org.example.it/ui@1.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/hugerte@1.0.14",
+      "name": "hugerte",
+      "version": "1.0.14",
+      "purl": "pkg:npm/hugerte@1.0.14"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:maven/org.example.it/ui@1.0",
+      "dependsOn": [
+        "pkg:npm/hugerte@1.0.14"
+      ]
+    },
+    {
+      "ref": "pkg:npm/hugerte@1.0.14"
+    }
+  ]
+}

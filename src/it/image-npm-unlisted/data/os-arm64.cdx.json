@@ -1,0 +1,147 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "anchore",
+          "name": "syft",
+          "version": "1.57.0"
+        }
+      ]
+    },
+    "component": {
+      "bom-ref": "ba5a4903c5069929",
+      "type": "container",
+      "name": "example/app",
+      "version": "sha256:0"
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "os:debian@12.12",
+      "type": "operating-system",
+      "name": "debian",
+      "version": "12.12"
+    },
+    {
+      "bom-ref": "pkg:npm/app@1.0.0?package-id=0000000000000001",
+      "type": "library",
+      "name": "app",
+      "version": "1.0.0",
+      "purl": "pkg:npm/app@1.0.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/express@5.1.0?package-id=0000000000000002",
+      "type": "library",
+      "name": "express",
+      "version": "5.1.0",
+      "purl": "pkg:npm/express@5.1.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/node_modules/express/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/%40example/native@2.0.0?package-id=0000000000000003",
+      "type": "library",
+      "name": "native",
+      "version": "2.0.0",
+      "purl": "pkg:npm/%40example/native@2.0.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/node_modules/@example/native/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/%40example/native-linux-arm64@2.0.0?package-id=0000000000000004",
+      "type": "library",
+      "name": "native-linux-arm64",
+      "version": "2.0.0",
+      "purl": "pkg:npm/%40example/native-linux-arm64@2.0.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/node_modules/@example/native-linux-arm64/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/hugerte@1.0.14?package-id=0000000000000005",
+      "type": "library",
+      "name": "hugerte",
+      "version": "1.0.14",
+      "purl": "pkg:npm/hugerte@1.0.14",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/web/assets/hugerte/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/express@5.1.0?package-id=0000000000000006",
+      "type": "library",
+      "name": "express",
+      "version": "5.1.0",
+      "purl": "pkg:npm/express@5.1.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-package-cataloger"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/local/lib/node_modules/npm/node_modules/express/package.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/left-pad@1.3.0?package-id=0000000000000007",
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.3.0",
+      "purl": "pkg:npm/left-pad@1.3.0",
+      "properties": [
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/share/app/node_modules/left-pad/package.json"
+        }
+      ]
+    }
+  ],
+  "dependencies": []
+}

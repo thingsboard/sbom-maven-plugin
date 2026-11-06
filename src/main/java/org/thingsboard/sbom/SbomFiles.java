@@ -8,11 +8,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 final class SbomFiles {
 
+    private static final List<String> HASH_ALGORITHMS = List.of("SHA-256", "SHA-512");
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private SbomFiles() {
@@ -31,10 +38,39 @@ final class SbomFiles {
 
     static void writeFile(Path file, JsonNode bom) {
         try {
+            Path parent = file.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             MAPPER.writeValue(file.toFile(), bom);
         } catch (IOException e) {
             throw new SbomException("Failed to write " + file, e);
         }
+    }
+
+    static Map<String, String> hashes(Path file) {
+        Map<String, MessageDigest> digests = new LinkedHashMap<>();
+        try {
+            for (String alg : HASH_ALGORITHMS) {
+                digests.put(alg, MessageDigest.getInstance(alg));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        byte[] buffer = new byte[1 << 16];
+        try (InputStream in = Files.newInputStream(file)) {
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                for (MessageDigest digest : digests.values()) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+        } catch (IOException e) {
+            throw new SbomException("Failed to read " + file, e);
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        digests.forEach((alg, digest) -> result.put(alg, HexFormat.of().formatHex(digest.digest())));
+        return result;
     }
 
     static JsonNode readResource(Path source, String resource) {
