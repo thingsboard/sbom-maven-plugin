@@ -341,6 +341,24 @@ class SbomImageTest {
     }
 
     @Test
+    void onlyTheCycleIsAttachedWhenItsMemberIsListedBeforeWhatItDependsOn() {
+        ObjectNode os = osSbom();
+        String jre17 = "pkg:deb/debian/openjdk-17-jre-headless@17.0.16?arch=amd64&distro=debian-13.7&package-id=1111111111111111";
+        String certificates = "pkg:deb/debian/ca-certificates-java@20240118?arch=all&distro=debian-13.7&package-id=2222222222222222";
+        String tzdata = "pkg:deb/debian/tzdata@2025b?arch=all&distro=debian-13.7&package-id=3333333333333333";
+        osPackage(os, jre17, "openjdk-17-jre-headless", "17.0.16");
+        osPackage(os, certificates, "ca-certificates-java", "20240118");
+        osPackage(os, tzdata, "tzdata", "2025b");
+        Boms.dependency(os, certificates, tzdata, jre17);
+        Boms.dependency(os, jre17, certificates);
+
+        JsonNode described = SbomImage.describe(os, image(), List.of(debComponent()));
+
+        assertThat(Boms.graph(described).get(IMAGE_REF)).hasSize(4).containsAnyOf(jre17, certificates).doesNotContain(tzdata);
+        assertThat(Boms.reachable(described, IMAGE_REF)).containsAll(SbomChecks.componentRefs(described));
+    }
+
+    @Test
     void failsWhenTheScanAlsoCatalogedWhatThePackageInstalls() {
         ObjectNode os = osSbom();
         String jar = "pkg:maven/org.thingsboard/application@4.4.1-SNAPSHOT";

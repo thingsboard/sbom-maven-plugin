@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -115,11 +116,10 @@ public final class SbomImage {
             component.dependencies().forEach((ref, targets) -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()).addAll(targets));
         }
         Set<String> reachable = SbomChecks.reachableFrom(rootRef, graph);
-        for (String ref : osTargets) {
-            if (componentsByRef.containsKey(ref) && !reachable.contains(ref)) {
-                rootDependsOn.add(ref);
-                SbomChecks.reachableFrom(ref, graph, reachable);
-            }
+        List<String> orphaned = osTargets.stream().filter(ref -> componentsByRef.containsKey(ref) && !reachable.contains(ref)).toList();
+        for (String ref : cycleEntries(orphaned, graph)) {
+            rootDependsOn.add(ref);
+            SbomChecks.reachableFrom(ref, graph, reachable);
         }
         componentsByRef.keySet().forEach(ref -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()));
         SbomJson.putDependencies(bom, graph);
@@ -128,6 +128,21 @@ public final class SbomImage {
         Set<String> unreachable = SbomChecks.unreachable(componentsByRef.keySet(), reachable);
         check(unreachable.isEmpty(), "Image SBOM components are not reachable from the image: " + unreachable);
         return bom;
+    }
+
+    private static List<String> cycleEntries(List<String> orphaned, Map<String, Set<String>> graph) {
+        Map<String, Set<String>> reaches = new HashMap<>();
+        orphaned.forEach(ref -> reaches.put(ref, SbomChecks.reachableFrom(ref, graph)));
+        Set<String> covered = new HashSet<>();
+        List<String> entries = new ArrayList<>();
+        for (String ref : orphaned) {
+            boolean source = orphaned.stream().noneMatch(other -> reaches.get(other).contains(ref) && !reaches.get(ref).contains(other));
+            if (source && !covered.contains(ref)) {
+                entries.add(ref);
+                covered.addAll(reaches.get(ref));
+            }
+        }
+        return entries;
     }
 
     private static void replaceOsPackages(JsonNode os, List<Bundled> included, Map<String, String> replaced) {

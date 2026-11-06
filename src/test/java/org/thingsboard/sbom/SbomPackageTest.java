@@ -306,6 +306,15 @@ class SbomPackageTest {
     }
 
     @Test
+    void doesNotReadTheApplicationSbomWhenEveryPackageIsSkipped() {
+        PackageFile skippedDeb = new PackageFile("deb", deb.toFile(), DEB_PURL, true);
+
+        List<Path> outputs = SbomPackage.writeAll(tempDir.resolve("missing.cdx.json"), "thingsboard", "4.4.0.1", List.of(skippedDeb), bundled());
+
+        assertThat(outputs).isEmpty();
+    }
+
+    @Test
     void writesNoPackageSbomWhenALaterPackageFails() throws IOException {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         Files.delete(zip);

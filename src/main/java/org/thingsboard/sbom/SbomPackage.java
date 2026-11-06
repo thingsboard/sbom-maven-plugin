@@ -27,14 +27,16 @@ public final class SbomPackage {
     }
 
     public static List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
+        List<PackageFile> included = packages.stream().filter(packageFile -> !packageFile.isSkip()).toList();
+        if (included.isEmpty()) {
+            return List.of();
+        }
         JsonNode application = SbomFiles.readFile(applicationSbom);
         checkApplication(application, components);
         Map<BundledComponent, Resolved> resolved = new HashMap<>();
         Map<Path, ObjectNode> described = new LinkedHashMap<>();
-        for (PackageFile packageFile : packages) {
-            if (!packageFile.isSkip()) {
-                described.put(outputFile(packageFile), describe(application, name, version, packageFile, components, resolved));
-            }
+        for (PackageFile packageFile : included) {
+            described.put(outputFile(packageFile), describe(application, name, version, packageFile, components, resolved));
         }
         described.forEach(SbomFiles::writeFile);
         return List.copyOf(described.keySet());
