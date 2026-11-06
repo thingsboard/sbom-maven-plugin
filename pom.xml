@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+    SPDX-License-Identifier: Apache-2.0
+
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -9,13 +15,15 @@
     <packaging>maven-plugin</packaging>
 
     <name>ThingsBoard SBOM Maven Plugin</name>
-    <description>Merges a CycloneDX SBOM embedded in a dependency into the project's CycloneDX SBOM</description>
+    <description>Builds CycloneDX SBOMs for ThingsBoard releases: merges embedded SBOMs, sets SBOM metadata and describes distribution packages and Docker images</description>
     <url>https://github.com/thingsboard/sbom-maven-plugin</url>
+    <inceptionYear>2026</inceptionYear>
 
     <licenses>
         <license>
-            <name>Apache-2.0</name>
-            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <name>Apache License 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
 
@@ -40,6 +48,7 @@
         <junit.version>5.14.4</junit.version>
         <assertj.version>3.27.7</assertj.version>
         <testcontainers.version>1.21.4</testcontainers.version>
+        <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
         <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     </properties>
 
@@ -156,6 +165,43 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>${license-maven-plugin.version}</version>
+                <configuration>
+                    <licenseSets>
+                        <licenseSet>
+                            <header>${project.basedir}/src/license/header.txt</header>
+                            <excludes>
+                                <exclude>src/license/**</exclude>
+                                <exclude>src/test/resources/**</exclude>
+                                <exclude>src/it/**</exclude>
+                            </excludes>
+                        </licenseSet>
+                        <licenseSet>
+                            <header>${project.basedir}/src/license/header.txt</header>
+                            <includes>
+                                <include>src/it/settings.xml</include>
+                                <include>src/it/**/pom.xml</include>
+                                <include>src/it/**/verify.groovy</include>
+                            </includes>
+                        </licenseSet>
+                    </licenseSets>
+                    <mapping>
+                        <java>SINGLE_LINE_DOUBLESLASH_STYLE</java>
+                        <groovy>SINGLE_LINE_DOUBLESLASH_STYLE</groovy>
+                    </mapping>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-plugin-plugin</artifactId>

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+// SPDX-License-Identifier: Apache-2.0
 import groovy.json.JsonSlurper
 
 def imageRef = 'pkg:docker/example/app@sha256%3A40c308b73fdf1f4fd3375881e6812825b42906b13cfef47e00c7dbe774391778?arch=amd64'
