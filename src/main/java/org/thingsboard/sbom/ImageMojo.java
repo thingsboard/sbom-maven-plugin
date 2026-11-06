@@ -57,11 +57,11 @@ public class ImageMojo extends AbstractMojo {
     private File outputFile;
 
     /**
-     * Bundled components, at least one: as in the {@code package} goal without {@code packages}, plus
+     * Bundled components, as in the {@code package} goal without {@code packages}, plus
      * {@code installDir} and {@code bundleDir} (absolute paths in the image). A component with an {@code sbom} sets
      * exactly one of {@code file}, {@code installDir} and {@code bundleDir}, which says how its SBOM is checked against the image.
      */
-    @Parameter
+    @Parameter(required = true)
     private List<BundledComponent> components = new ArrayList<>();
 
     /**
