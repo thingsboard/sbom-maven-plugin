@@ -19,6 +19,11 @@
     <url>https://github.com/thingsboard/sbom-maven-plugin</url>
     <inceptionYear>2026</inceptionYear>
 
+    <organization>
+        <name>ThingsBoard, Inc.</name>
+        <url>https://thingsboard.io</url>
+    </organization>
+
     <licenses>
         <license>
             <name>Apache License 2.0</name>
@@ -27,10 +32,25 @@
         </license>
     </licenses>
 
+    <developers>
+        <developer>
+            <id>thingsboard</id>
+            <name>ThingsBoard Team</name>
+            <organization>ThingsBoard, Inc.</organization>
+            <organizationUrl>https://thingsboard.io</organizationUrl>
+        </developer>
+    </developers>
+
     <scm>
         <url>https://github.com/thingsboard/sbom-maven-plugin</url>
         <connection>scm:git:https://github.com/thingsboard/sbom-maven-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:thingsboard/sbom-maven-plugin.git</developerConnection>
     </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/thingsboard/sbom-maven-plugin/issues</url>
+    </issueManagement>
 
     <prerequisites>
         <maven>${maven-api.version}</maven>
