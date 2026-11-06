@@ -10,7 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['17', '25']
+        include:
+          - java: '17'
+          - java: '25'
+          # The oldest Maven the plugin supports (see maven-api.version in pom.xml)
+          - java: '17'
+            maven: '3.8.7'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,9 +23,12 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: maven
-      - run: mvn -B install
+      - name: Switch the Maven Wrapper to Maven ${{ matrix.maven }}
+        if: matrix.maven
+        run: ./mvnw -B -q org.apache.maven.plugins:maven-wrapper-plugin:3.3.4:wrapper -Dmaven=${{ matrix.maven }}
+      - run: ./mvnw -B -V install
       - name: Check that a rebuild produces identical artifacts
-        run: mvn -B clean verify artifact:compare -DskipTests -Dinvoker.skip
+        run: ./mvnw -B clean verify artifact:compare -DskipTests -Dinvoker.skip
       - name: Keep the locally installed plugin out of the Maven cache
         if: always()
         run: rm -rf ~/.m2/repository/org/thingsboard/sbom-maven-plugin
