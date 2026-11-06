@@ -306,7 +306,21 @@
                 <version>${maven-plugin-tools.version}</version>
                 <configuration>
                     <goalPrefix>tb-sbom</goalPrefix>
+                    <extractors>
+                        <extractor>java-annotations</extractor>
+                    </extractors>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>help-goal</id>
+                        <goals>
+                            <goal>helpmojo</goal>
+                        </goals>
+                        <configuration>
+                            <helpPackageName>org.thingsboard.sbom</helpPackageName>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
