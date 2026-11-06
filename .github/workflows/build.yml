@@ -31,7 +31,7 @@ jobs:
         run: ./mvnw -B -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
       - run: ./mvnw -B -V install
       - name: Check that a rebuild produces identical artifacts
-        run: ./mvnw -B clean verify artifact:compare -DskipTests -Dinvoker.skip
+        run: ./mvnw -B clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip
       - name: Keep the locally installed plugin out of the Maven cache
         if: always()
         run: rm -rf ~/.m2/repository/org/thingsboard/sbom-maven-plugin
