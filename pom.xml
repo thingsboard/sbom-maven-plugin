@@ -76,7 +76,7 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
-            <!-- maven-core (provided, so also on the test classpath) brings an old commons-lang3 that would shadow the one Testcontainers needs -->
+            <!-- maven-core < 3.9.8 (provided, so also on the test classpath) brings an old commons-lang3 that would shadow the one Testcontainers needs; remove once maven-api.version >= 3.9.8 -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
