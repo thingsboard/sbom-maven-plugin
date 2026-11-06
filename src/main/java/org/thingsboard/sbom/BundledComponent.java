@@ -1,0 +1,134 @@
+package org.thingsboard.sbom;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+public class BundledComponent {
+
+    private String type = "library";
+    private String group;
+    private String name;
+    private String version;
+    private String description;
+    private String purl;
+    private String cpe;
+    private String license;
+    private Organization supplier;
+    private File file;
+    private File sbom;
+    private List<String> packages = new ArrayList<>();
+
+    public BundledComponent() {
+    }
+
+    public BundledComponent(String type, String name, String version, File file) {
+        this.type = type;
+        this.name = name;
+        this.version = version;
+        this.file = file;
+    }
+
+    public BundledComponent group(String group) {
+        this.group = group;
+        return this;
+    }
+
+    public BundledComponent description(String description) {
+        this.description = description;
+        return this;
+    }
+
+    public BundledComponent purl(String purl) {
+        this.purl = purl;
+        return this;
+    }
+
+    public BundledComponent cpe(String cpe) {
+        this.cpe = cpe;
+        return this;
+    }
+
+    public BundledComponent license(String license) {
+        this.license = license;
+        return this;
+    }
+
+    public BundledComponent supplier(Organization supplier) {
+        this.supplier = supplier;
+        return this;
+    }
+
+    public BundledComponent sbom(File sbom) {
+        this.sbom = sbom;
+        return this;
+    }
+
+    public BundledComponent packages(List<String> packages) {
+        this.packages = packages;
+        return this;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public String getGroup() {
+        return group;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getPurl() {
+        return purl;
+    }
+
+    public String getCpe() {
+        return cpe;
+    }
+
+    public String getLicense() {
+        return license;
+    }
+
+    public Organization getSupplier() {
+        return supplier;
+    }
+
+    public File getFile() {
+        return file;
+    }
+
+    public File getSbom() {
+        return sbom;
+    }
+
+    public List<String> getPackages() {
+        return packages == null ? List.of() : packages;
+    }
+
+    String ref() {
+        if (sbom != null && (name == null || name.isBlank())) {
+            return "sbom " + sbom;
+        }
+        if (purl != null && !purl.isBlank()) {
+            return purl;
+        }
+        return version == null || version.isBlank() ? name : name + "@" + version;
+    }
+
+    boolean includedIn(String packageId) {
+        return getPackages().isEmpty() || getPackages().contains(packageId);
+    }
+
+}

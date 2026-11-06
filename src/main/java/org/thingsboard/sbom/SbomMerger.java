@@ -79,7 +79,7 @@ public final class SbomMerger {
         return ref.equals(nestedRootRef) ? hostRef : ref;
     }
 
-    private static void mergeTools(ObjectNode merged, JsonNode nested) {
+    static void mergeTools(ObjectNode merged, JsonNode nested) {
         ArrayNode tools = merged.withObjectProperty("metadata").withObjectProperty("tools").withArrayProperty("components");
         Set<String> known = new HashSet<>();
         tools.forEach(tool -> known.add(toolKey(tool)));

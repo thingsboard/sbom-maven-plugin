@@ -3,14 +3,20 @@ package org.thingsboard.sbom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,6 +58,30 @@ class CycloneDxCliValidationTest {
     void fixturesThemselvesPassTheOfficialCliValidation() {
         assertThat(validate(Boms.mavenFixture()).passed()).isTrue();
         assertThat(validate(Boms.npmFixture()).passed()).isTrue();
+    }
+
+    @Test
+    void packageSbomPassesTheOfficialCliValidation(@TempDir Path tempDir) throws IOException {
+        Path deb = Files.writeString(tempDir.resolve("thingsboard.deb"), "deb contents");
+        Path bundle = Files.writeString(tempDir.resolve("extension.js"), "console.log('extension');");
+        Path registry = Files.createDirectory(tempDir.resolve("registry"));
+        Files.writeString(registry.resolve("3.xml"), "<LWM2M/>");
+        Path certificate = tempDir.resolve("root-ca.crt.pem");
+        try (InputStream in = CycloneDxCliValidationTest.class.getResourceAsStream("/fixtures/root-ca.crt.pem")) {
+            Files.copy(in, certificate);
+        }
+        List<BundledComponent> components = List.of(
+                new BundledComponent("library", "gateway-management-extension", "4.4.0.1", bundle.toFile())
+                        .supplier(SbomMetadataTest.THINGSBOARD).license("Apache-2.0"),
+                new BundledComponent("data", "lwm2m-registry", null, registry.toFile()),
+                new BundledComponent("cryptographic-asset", "DigiCert Global Root G2", null, certificate.toFile()));
+
+        ObjectNode described = SbomPackage.describe(SbomPackageTest.application(), "thingsboard", "4.4.0.1",
+                new PackageFile("deb", deb.toFile(), SbomPackageTest.DEB_PURL, false), components);
+
+        CliResult result = validate(described);
+
+        assertThat(result.passed()).as(result.logs()).isTrue();
     }
 
     @Test
