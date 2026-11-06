@@ -298,12 +298,17 @@
                         </goals>
                         <configuration>
                             <rules>
+                                <!-- Not provided: Maven supplies its own copies of those at runtime -->
                                 <dependencyConvergence>
                                     <excludedScopes>
                                         <excludedScope>provided</excludedScope>
                                     </excludedScopes>
                                 </dependencyConvergence>
-                                <requireUpperBoundDeps/>
+                                <requireUpperBoundDeps>
+                                    <excludedScopes>
+                                        <excludedScope>provided</excludedScope>
+                                    </excludedScopes>
+                                </requireUpperBoundDeps>
                                 <banDuplicatePomDependencyVersions/>
                             </rules>
                         </configuration>
