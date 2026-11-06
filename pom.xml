@@ -299,13 +299,17 @@
                 <artifactId>maven-artifact-plugin</artifactId>
                 <version>${maven-artifact-plugin.version}</version>
                 <executions>
-                    <!-- Reports plugins with known reproducibility issues; 3.7.0 only logs them, so the CI rebuild comparison is what fails the build -->
+                    <!-- Fails on version ranges in the dependencies. In 3.7.0 it only logs plugins with known reproducibility issues
+                         and a missing outputTimestamp, so the CI rebuild comparison is what catches those. -->
                     <execution>
                         <id>check-buildplan</id>
                         <phase>validate</phase>
                         <goals>
                             <goal>check-buildplan</goal>
                         </goals>
+                        <configuration>
+                            <failOnNonReproducible>true</failOnNonReproducible>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
