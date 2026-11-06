@@ -411,6 +411,7 @@
                 </configuration>
                 <executions>
                     <execution>
+                        <id>check-license-headers</id>
                         <phase>validate</phase>
                         <goals>
                             <goal>check</goal>
@@ -459,6 +460,7 @@
                 <version>${maven-failsafe-plugin.version}</version>
                 <executions>
                     <execution>
+                        <id>it-classes</id>
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
@@ -485,7 +487,7 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>integration-test</id>
+                        <id>it-projects</id>
                         <goals>
                             <goal>install</goal>
                             <goal>run</goal>
