@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+// SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
 import com.fasterxml.jackson.databind.JsonNode;
