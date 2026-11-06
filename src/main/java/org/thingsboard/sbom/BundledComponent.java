@@ -17,6 +17,8 @@ public class BundledComponent {
     private Organization supplier;
     private File file;
     private File sbom;
+    private String installDir;
+    private String bundleDir;
     private List<String> packages = new ArrayList<>();
 
     public BundledComponent() {
@@ -61,6 +63,16 @@ public class BundledComponent {
 
     public BundledComponent sbom(File sbom) {
         this.sbom = sbom;
+        return this;
+    }
+
+    public BundledComponent installDir(String installDir) {
+        this.installDir = installDir;
+        return this;
+    }
+
+    public BundledComponent bundleDir(String bundleDir) {
+        this.bundleDir = bundleDir;
         return this;
     }
 
@@ -111,6 +123,14 @@ public class BundledComponent {
 
     public File getSbom() {
         return sbom;
+    }
+
+    public String getInstallDir() {
+        return installDir;
+    }
+
+    public String getBundleDir() {
+        return bundleDir;
     }
 
     public List<String> getPackages() {

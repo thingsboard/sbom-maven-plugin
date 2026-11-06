@@ -31,6 +31,10 @@ final class SbomFiles {
 
     static void writeFile(Path file, JsonNode bom) {
         try {
+            Path parent = file.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             MAPPER.writeValue(file.toFile(), bom);
         } catch (IOException e) {
             throw new SbomException("Failed to write " + file, e);

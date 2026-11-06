@@ -593,6 +593,15 @@ class SbomPackageTest {
     }
 
     @Test
+    void configCheckRejectsImageOnlyDirectories() {
+        BundledComponent component = new BundledComponent("library", "app", "1.0", bundle.toFile()).installDir("/usr/share/app");
+
+        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), List.of(component)))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("sets installDir or bundleDir, which only apply to image SBOMs");
+    }
+
+    @Test
     void configCheckRejectsAComponentSbomWithoutFile() {
         BundledComponent component = new BundledComponent("library", null, null, null).sbom(tempDir.resolve("extension.cdx.json").toFile());
 

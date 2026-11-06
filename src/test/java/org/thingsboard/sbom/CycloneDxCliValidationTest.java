@@ -85,6 +85,21 @@ class CycloneDxCliValidationTest {
     }
 
     @Test
+    void imageSbomPassesTheOfficialCliValidation(@TempDir Path tempDir) throws IOException {
+        Path deb = Files.writeString(tempDir.resolve("tb-mqtt-transport.deb"), "deb contents");
+        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
+        Path packageSbom = SbomPackage.writeFor(applicationSbom, "tb-mqtt-transport", "4.4.1",
+                new PackageFile("deb", deb.toFile(), SbomImageTest.DEB_PURL, false), List.of());
+
+        ObjectNode described = SbomImage.describe(SbomImageTest.osSbom(), SbomImageTest.image(),
+                List.of(new BundledComponent("library", null, null, deb.toFile()).sbom(packageSbom.toFile())));
+
+        CliResult result = validate(described);
+
+        assertThat(result.passed()).as(result.logs()).isTrue();
+    }
+
+    @Test
     void cliRejectsAnInvalidBom() {
         ObjectNode broken = SbomMerger.merge(Boms.mavenFixture(), Boms.npmFixture(), Boms.HOST_PREFIX);
         ((ObjectNode) broken.get("components").get(0)).remove("name");

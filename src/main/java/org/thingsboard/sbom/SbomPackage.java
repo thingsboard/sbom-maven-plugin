@@ -81,6 +81,8 @@ public final class SbomPackage {
             } else {
                 checkSbomComponent(component);
             }
+            check(component.getInstallDir() == null && component.getBundleDir() == null,
+                    "Bundled component " + component.ref() + " sets installDir or bundleDir, which only apply to image SBOMs");
             check(refs.add(component.ref()), "Bundled component " + component.ref() + " is declared more than once");
         }
     }

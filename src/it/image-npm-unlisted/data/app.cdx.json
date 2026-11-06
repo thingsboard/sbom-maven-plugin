@@ -1,0 +1,109 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "library",
+          "group": "@cyclonedx",
+          "name": "cyclonedx-library",
+          "version": "10.3.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:maven/org.example.it/app@1.0",
+      "name": "app",
+      "group": "org.example.it",
+      "version": "1.0",
+      "purl": "pkg:maven/org.example.it/app@1.0",
+      "manufacturer": {
+        "name": "Example, Inc."
+      }
+    },
+    "supplier": {
+      "name": "Example, Inc."
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/express@5.1.0",
+      "name": "express",
+      "version": "5.1.0",
+      "purl": "pkg:npm/express@5.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/express"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40example/native@2.0.0",
+      "group": "@example",
+      "name": "native",
+      "version": "2.0.0",
+      "purl": "pkg:npm/%40example/native@2.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@example/native"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40example/native-linux-x64@2.0.0",
+      "group": "@example",
+      "name": "native-linux-x64",
+      "version": "2.0.0",
+      "purl": "pkg:npm/%40example/native-linux-x64@2.0.0",
+      "scope": "optional",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@example/native-linux-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40example/native-linux-arm64@2.0.0",
+      "group": "@example",
+      "name": "native-linux-arm64",
+      "version": "2.0.0",
+      "purl": "pkg:npm/%40example/native-linux-arm64@2.0.0",
+      "scope": "optional"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:maven/org.example.it/app@1.0",
+      "dependsOn": [
+        "pkg:npm/express@5.1.0",
+        "pkg:npm/%40example/native@2.0.0"
+      ]
+    },
+    {
+      "ref": "pkg:npm/express@5.1.0"
+    },
+    {
+      "ref": "pkg:npm/%40example/native@2.0.0",
+      "dependsOn": [
+        "pkg:npm/%40example/native-linux-x64@2.0.0",
+        "pkg:npm/%40example/native-linux-arm64@2.0.0"
+      ]
+    },
+    {
+      "ref": "pkg:npm/%40example/native-linux-x64@2.0.0"
+    },
+    {
+      "ref": "pkg:npm/%40example/native-linux-arm64@2.0.0"
+    }
+  ]
+}
