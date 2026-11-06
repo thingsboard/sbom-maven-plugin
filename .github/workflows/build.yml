@@ -16,6 +16,8 @@ jobs:
           # The oldest Maven the plugin supports (see maven-api.version in pom.xml)
           - java: '17'
             maven: '3.8.7'
+            # SHA-256 of apache-maven-3.8.7-bin.zip, checked against the SHA-512 Apache publishes
+            maven-sha256: '70f7fec785728560e5382f1f17fbd8d9dfab391bf87b29cad1a60e54e60b2a7a'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,7 +27,7 @@ jobs:
           cache: maven
       - name: Switch the Maven Wrapper to Maven ${{ matrix.maven }}
         if: matrix.maven
-        run: ./mvnw -B -q org.apache.maven.plugins:maven-wrapper-plugin:3.3.4:wrapper -Dmaven=${{ matrix.maven }}
+        run: ./mvnw -B -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
       - run: ./mvnw -B -V install
       - name: Check that a rebuild produces identical artifacts
         run: ./mvnw -B clean verify artifact:compare -DskipTests -Dinvoker.skip
