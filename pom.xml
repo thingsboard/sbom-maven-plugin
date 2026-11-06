@@ -219,6 +219,16 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <compilerArgs>
+                            <arg>-Xlint:all</arg>
+                            <!-- Javadoc must be valid where it exists, but is not required everywhere -->
+                            <arg>-Xdoclint:all,-missing</arg>
+                        </compilerArgs>
+                        <failOnWarning>true</failOnWarning>
+                        <!-- Nothing here needs annotation processing; without this, JDKs before 23 run the Sisu index processor from maven-core -->
+                        <proc>none</proc>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
