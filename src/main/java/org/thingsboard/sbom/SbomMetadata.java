@@ -48,7 +48,7 @@ public final class SbomMetadata {
         return updated;
     }
 
-    private static ObjectNode toJson(String label, Organization organization) {
+    static ObjectNode toJson(String label, Organization organization) {
         check(organization.getName() != null && !organization.getName().isBlank(), label + " has no name");
         ObjectNode json = JsonNodeFactory.instance.objectNode().put("name", organization.getName());
         if (!organization.getUrls().isEmpty()) {

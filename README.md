@@ -119,7 +119,7 @@ The build fails, and the file is left untouched, when nothing is configured, an 
 </execution>
 ```
 
-The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. For each package that is not skipped it writes `<package file>.cdx.json` next to the package:
+The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
 
 - The package is the root component (`metadata.component`): the configured `name`, `version` and `purl`, the SHA-256 and SHA-512 of the package file, and the description, licenses, manufacturer and website of the application.
 - The application SBOM's root and all its components and dependencies are kept unchanged; the package depends on the application.
@@ -130,13 +130,13 @@ The `package` goal runs at `package` by default. Declare the plugin after the pl
 | Parameter | Property | Default | Description |
 | --- | --- | --- | --- |
 | `packages` | | required | Packages to describe: `id`, `file`, `purl`, optional `skip` |
-| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (SPDX expression), `supplier` (`name`, `urls`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
+| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (SPDX expression), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
 | `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component |
 | `version` | `sbom.package.version` | `${project.version}` | Version of the package component |
 | `sourceFile` | `sbom.package.sourceFile` | `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json` | Application SBOM to start from |
 | `skip` | `sbom.package.skip` | `false` | Skip all packages |
 
-The build fails, and no package SBOM is written, when package ids repeat, a package has no purl or an invalid one, a package file is missing or empty, a bundled component has no name, is declared twice, has an `sbom` together with details of its own or without a `file`, sets `installDir` or `bundleDir`, has an `sbom` that is invalid, uses another spec version, has components its root does not depend on, or does not match the file's hashes, refers to an unknown package id, points to a missing file or an empty directory, or clashes with a component already in the SBOM, a `cryptographic-asset` is not an X.509 certificate, a `cpe` does not start with `cpe:2.3:` or `cpe:/`, or the result fails schema validation or loses a dependency path of the application.
+The build fails, and no package SBOM is written, when package ids repeat, a package has no purl or an invalid one, a package file is missing or empty, a bundled component has no name, is declared twice, has an `sbom` together with details of its own or without a `file`, sets `installDir` or `bundleDir`, still contains an unresolved `${...}` property, has a supplier without name or with a blank url, has an `sbom` that is invalid, uses another spec version, has components its root does not depend on, or does not match the file's hashes, refers to an unknown package id, points to a missing file or an empty directory, or clashes with a component already in the SBOM, a `cryptographic-asset` is not an X.509 certificate, a `cpe` does not start with `cpe:2.3:` or `cpe:/`, or the result fails schema validation or loses a dependency path of the application.
 
 ## image goal
 
@@ -162,12 +162,12 @@ The `image` goal has no default phase: it runs after the image is pushed, once p
 
 ```
 syft scan registry:thingsboard/tb-node@sha256:40c3... --exclude '/usr/share/thingsboard/**' -o cyclonedx-json@1.6=os-amd64.cdx.json
-mvn sbom:image@image-sbom -Dsbom.image.osSbom=os-amd64.cdx.json -Dsbom.image.digest=sha256:40c3... -Dsbom.image.architecture=amd64
+mvn tb-sbom:image@image-sbom -Dsbom.image.osSbom=os-amd64.cdx.json -Dsbom.image.digest=sha256:40c3... -Dsbom.image.architecture=amd64
 ```
 
 The result describes the image as a `container` root component (`pkg:docker/<repository>@<digest>?arch=<architecture>`, version = tag, SHA-256 = digest) that depends on everything in it:
 
-- Everything the scan found is kept unchanged, except what the bundled components replace. The scan's own root is dropped; the image depends on the scanned components nothing else depends on.
+- Everything the scan found is kept unchanged, except what the bundled components replace. The scan's own root is dropped; the image depends on the scanned components nothing else depends on, and on one component of each dependency cycle nothing outside the cycle depends on.
 - Each bundled component is added with its SBOM, as in the `package` goal, and the image depends on it. Its tools are added to `metadata.tools`; `lifecycles`, `manufacturer`, `supplier` and the root's manufacturer come from the first bundled SBOM.
 - The `serialNumber` is derived from the image purl, so each architecture's SBOM has its own.
 
@@ -175,7 +175,7 @@ A bundled component with an `sbom` says how its SBOM is checked against the imag
 
 | Anchor | For | Check |
 | --- | --- | --- |
-| `file` | A package the image installs, e.g. `.deb` | The SBOM must give the SHA-256 of `file`, as in the `package` goal. When its root is a `deb`, `rpm` or `apk` package, the scan must list exactly one installed package of that type and name; it is replaced by the SBOM's root and keeps the dependencies the scan found (e.g. on the JRE). Exclude the package's install directory from the scan: the build fails when the scan lists any component of the SBOM. |
+| `file` | A package the image installs, e.g. `.deb` | The SBOM must give the SHA-256 of `file`, as in the `package` goal. When its root is a `deb`, `rpm` or `apk` package, the scan must list exactly one installed package with that purl type and name, and with the version of the SBOM's purl; it is replaced by the SBOM's root and keeps the dependencies the scan found (e.g. on the JRE). Exclude the package's install directory from the scan: the build fails when the scan lists any component of the SBOM. |
 | `installDir` | An npm application installed in the image by `yarn install` | Everything the scan found under the directory must be in the SBOM at the same path (`cdx:npm:package:path`) and version, or be an optional package without a path that matches by purl; it is replaced by the SBOM's component. Every required package must be installed at each of its paths. Optional packages (`scope: optional`) the image does not have are dropped with their dependencies, so platform-specific packages listed for every platform (`yarn-sbom.js --all-platforms`) keep only the ones this architecture installs. The scan's entry for the application's own `package.json` is replaced by the SBOM's root. Do not exclude the directory from the scan. |
 | `bundleDir` | Prebuilt files copied into the image, e.g. a web UI bundle | Everything the scan found under the directory must be in the SBOM by purl; it is replaced by the SBOM's component. The SBOM may list more, since bundled code has no files per package. |
 
@@ -191,10 +191,10 @@ A bundled component without an `sbom`, such as a browser an install script downl
 | `digest` | `sbom.image.digest` | required | `sha256:` digest of this architecture's image manifest, not of the multi-architecture index |
 | `architecture` | `sbom.image.architecture` | required | Architecture of the image, e.g. `amd64` |
 | `outputFile` | `sbom.image.outputFile` | required | Where to write the image SBOM |
-| `components` | | required | Bundled components, as in the `package` goal, plus `installDir` and `bundleDir` (absolute paths in the image) |
+| `components` | | required | Bundled components, as in the `package` goal without `packages`, plus `installDir` and `bundleDir` (absolute paths in the image) |
 | `skip` | `sbom.image.skip` | `false` | Skip the image SBOM |
 
-The build fails, and no image SBOM is written, when the repository is not `<namespace>/<name>`, the digest is not `sha256:` and 64 hex digits, the tag or architecture is blank, no components are configured, a component with an `sbom` sets none or more than one of `file`, `installDir` and `bundleDir`, a component without an `sbom` sets a directory, a directory is not absolute or ends with `/`, a value still contains an unresolved `${...}` property, the scan does not list a `file` package exactly once, the scan lists a component of a `file` component's SBOM, the image has a package under a directory that the SBOM does not list or lists with another version, a required package is not installed at its path or has no path, components clash, the result fails schema validation, or a component is not reachable from the image.
+The build fails, and no image SBOM is written, when the repository is not `<namespace>/<name>`, the digest is not `sha256:` and 64 hex digits, the tag or architecture is blank, no components are configured, a component has no name, is declared twice, has an `sbom` together with details of its own, sets `packages`, or has a supplier without name or with a blank url, a component with an `sbom` sets none or more than one of `file`, `installDir` and `bundleDir`, a component without an `sbom` sets a directory, a directory is not absolute or ends with `/`, a value still contains an unresolved `${...}` property, the scan does not list a `file` package exactly once or lists it with another version, the scan lists a component of a `file` component's SBOM, the image has a component without a purl under a directory, or a package that the SBOM does not list or lists with another version, a required package is not installed at its path or has no path, components clash, the result fails schema validation, or a component is not reachable from the image.
 
 ## What the merge does
 

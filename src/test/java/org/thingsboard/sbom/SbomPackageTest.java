@@ -153,7 +153,8 @@ class SbomPackageTest {
         assertThat(extension.path("version").asText()).isEqualTo("4.4.0.1");
         assertThat(extension.path("description").asText()).isEqualTo("Gateway UI extension");
         assertThat(extension.path("licenses")).isEqualTo(Boms.MAPPER.readTree("[{\"expression\":\"Apache-2.0\"}]"));
-        assertThat(extension.path("supplier")).isEqualTo(Boms.MAPPER.readTree("{\"name\":\"ThingsBoard, Inc.\",\"url\":[\"https://thingsboard.io\"]}"));
+        assertThat(extension.path("supplier")).isEqualTo(Boms.MAPPER.readTree("""
+                {"name":"ThingsBoard, Inc.","url":["https://thingsboard.io"],"contact":[{"email":"security@thingsboard.io"}]}"""));
         assertThat(extension.path("hashes").get(1).path("content").asText()).isEqualTo(sha("SHA-512", bundle));
     }
 
@@ -291,6 +292,49 @@ class SbomPackageTest {
                 .isInstanceOf(SbomException.class);
 
         assertThat(tempDir.resolve("thingsboard.deb.cdx.json")).doesNotExist();
+    }
+
+    @Test
+    void writesEveryPackageThatIsNotSkipped() throws IOException {
+        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
+        PackageFile skippedZip = new PackageFile("zip", zip.toFile(), "pkg:generic/thingsboard/thingsboard-windows@4.4.0.1", true);
+
+        List<Path> outputs = SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), skippedZip), List.of());
+
+        assertThat(outputs).containsExactly(tempDir.resolve("thingsboard.deb.cdx.json"));
+        assertThat(tempDir.resolve("thingsboard-windows.zip.cdx.json")).doesNotExist();
+    }
+
+    @Test
+    void writesNoPackageSbomWhenALaterPackageFails() throws IOException {
+        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
+        Files.delete(zip);
+
+        assertThatThrownBy(() -> SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), zipPackage()), List.of()))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("thingsboard-windows.zip does not exist");
+
+        assertThat(tempDir.resolve("thingsboard.deb.cdx.json")).doesNotExist();
+    }
+
+    @Test
+    void failsOnABlankSupplierUrl() {
+        List<BundledComponent> components = List.of(new BundledComponent("library", "extension", "1.0", bundle.toFile())
+                .supplier(new Organization("Example, Inc.", List.of(" "), List.of())));
+
+        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Supplier of bundled component extension@1.0 has a blank url");
+    }
+
+    @Test
+    void configCheckRejectsAnUnresolvedProperty() {
+        List<BundledComponent> components = List.of(new BundledComponent("library", "extension", "1.0", bundle.toFile())
+                .supplier(new Organization("${vendor}", List.of(), List.of())));
+
+        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled component extension@1.0 has the unresolved property in ${vendor}");
     }
 
     @Test

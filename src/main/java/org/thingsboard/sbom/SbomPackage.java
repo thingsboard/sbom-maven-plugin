@@ -16,7 +16,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,6 +51,18 @@ public final class SbomPackage {
         return output;
     }
 
+    public static List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
+        JsonNode application = SbomFiles.readFile(applicationSbom);
+        Map<Path, ObjectNode> described = new LinkedHashMap<>();
+        for (PackageFile packageFile : packages) {
+            if (!packageFile.isSkip()) {
+                described.put(outputFile(packageFile), describe(application, name, version, packageFile, components));
+            }
+        }
+        described.forEach(SbomFiles::writeFile);
+        return List.copyOf(described.keySet());
+    }
+
     public static void checkConfig(List<PackageFile> packages, List<BundledComponent> components) {
         check(packages != null && !packages.isEmpty(), "No packages configured");
         Set<String> ids = new LinkedHashSet<>();
@@ -59,7 +70,7 @@ public final class SbomPackage {
             checkPackage(packageFile);
             check(ids.add(packageFile.getId()), "Package id " + packageFile.getId() + " is used more than once");
         }
-        checkComponents(components);
+        BundledComponents.check(components, BundledComponents.Goal.PACKAGE);
         for (BundledComponent component : components) {
             for (String id : component.getPackages()) {
                 check(ids.contains(id), "Bundled component " + component.ref() + " refers to unknown package " + id + "; known packages are " + ids);
@@ -73,44 +84,10 @@ public final class SbomPackage {
         checkPurl("Package " + packageFile.getId(), packageFile.getPurl());
     }
 
-    private static void checkComponents(List<BundledComponent> components) {
-        Set<String> refs = new HashSet<>();
-        for (BundledComponent component : components) {
-            if (component.getSbom() == null) {
-                check(component.getName() != null && !component.getName().isBlank(), "A bundled component has no name");
-            } else {
-                checkSbomComponent(component);
-            }
-            check(component.getInstallDir() == null && component.getBundleDir() == null,
-                    "Bundled component " + component.ref() + " sets installDir or bundleDir, which only apply to image SBOMs");
-            check(refs.add(component.ref()), "Bundled component " + component.ref() + " is declared more than once");
-        }
-    }
-
-    private static void checkSbomComponent(BundledComponent component) {
-        Map<String, String> details = new LinkedHashMap<>();
-        details.put("group", component.getGroup());
-        details.put("name", component.getName());
-        details.put("version", component.getVersion());
-        details.put("description", component.getDescription());
-        details.put("purl", component.getPurl());
-        details.put("cpe", component.getCpe());
-        details.put("license", component.getLicense());
-        List<String> set = new ArrayList<>(details.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
-                .map(Map.Entry::getKey)
-                .toList());
-        if (component.getSupplier() != null) {
-            set.add("supplier");
-        }
-        check(set.isEmpty(), "Bundled component " + component.ref() + " takes its details from its SBOM and must not set " + set);
-        check(component.getFile() != null, "Bundled component " + component.ref() + " has an SBOM but no file to check it against");
-    }
-
     public static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, List<BundledComponent> components) {
         SbomChecks.checkInput("Application", application);
         checkPackage(packageFile);
-        checkComponents(components);
+        BundledComponents.check(components, BundledComponents.Goal.PACKAGE);
         check(name != null && !name.isBlank(), "Package name is blank");
         check(version != null && !version.isBlank(), "Package version is blank");
         Path file = packageFile.getFile().toPath();
@@ -165,7 +142,7 @@ public final class SbomPackage {
                     bomComponents.add(nested.deepCopy());
                     componentsByRef.put(ref, nested);
                 } else {
-                    check(known != null && !nested.path("purl").asText().isEmpty() && known.path("purl").asText().equals(nested.path("purl").asText()),
+                    check(sameComponent(known, nested),
                             "Component " + ref + " from the SBOM of " + component.ref() + " clashes with a different component that is already in the SBOM");
                 }
             }
@@ -289,7 +266,7 @@ public final class SbomPackage {
         json.put("type", component.getType() == null || component.getType().isBlank() ? "library" : component.getType());
         json.put("bom-ref", component.ref());
         if (component.getSupplier() != null) {
-            json.set("supplier", organization(component));
+            json.set("supplier", SbomMetadata.toJson("Supplier of bundled component " + component.ref(), component.getSupplier()));
         }
         putIfPresent(json, "group", component.getGroup());
         json.put("name", component.getName());
@@ -320,17 +297,6 @@ public final class SbomPackage {
             check(component.getFile() != null && Files.isRegularFile(component.getFile().toPath()),
                     "Bundled component " + component.ref() + " is a cryptographic-asset and needs a certificate file");
             json.set("cryptoProperties", certificateProperties(component.ref(), component.getFile().toPath()));
-        }
-        return json;
-    }
-
-    private static ObjectNode organization(BundledComponent component) {
-        Organization supplier = component.getSupplier();
-        check(supplier.getName() != null && !supplier.getName().isBlank(), "Bundled component " + component.ref() + " has a supplier without name");
-        ObjectNode json = JsonNodeFactory.instance.objectNode().put("name", supplier.getName());
-        if (!supplier.getUrls().isEmpty()) {
-            ArrayNode urls = json.putArray("url");
-            supplier.getUrls().forEach(urls::add);
         }
         return json;
     }
@@ -380,6 +346,10 @@ public final class SbomPackage {
                 check(unreachable.isEmpty(), "Components from the SBOM of " + component.ref() + " are not reachable from the package: " + unreachable);
             }
         }
+    }
+
+    static boolean sameComponent(JsonNode known, JsonNode component) {
+        return known != null && !component.path("purl").asText().isEmpty() && known.path("purl").asText().equals(component.path("purl").asText());
     }
 
     static Map<String, Set<String>> dependencyGraph(JsonNode bom) {

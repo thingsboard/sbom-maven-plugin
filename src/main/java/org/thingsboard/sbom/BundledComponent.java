@@ -2,7 +2,9 @@ package org.thingsboard.sbom;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public class BundledComponent {
 
@@ -145,6 +147,19 @@ public class BundledComponent {
             return purl;
         }
         return version == null || version.isBlank() ? name : name + "@" + version;
+    }
+
+    List<String> configuredValues() {
+        List<String> values = new ArrayList<>(Arrays.asList(type, group, name, version, description, purl, cpe, license, installDir, bundleDir,
+                file == null ? null : file.getPath(), sbom == null ? null : sbom.getPath()));
+        values.addAll(getPackages());
+        if (supplier != null) {
+            values.add(supplier.getName());
+            values.addAll(supplier.getUrls());
+            supplier.getContacts().forEach(contact -> values.addAll(Arrays.asList(contact.getName(), contact.getEmail(), contact.getPhone())));
+        }
+        values.removeIf(Objects::isNull);
+        return values;
     }
 
     boolean includedIn(String packageId) {

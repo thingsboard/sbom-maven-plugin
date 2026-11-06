@@ -296,11 +296,48 @@ class SbomImageTest {
     void aPackageOfAnotherTypeWithTheSameNameIsNotReplaced() {
         ObjectNode os = osSbom();
         String rpm = "pkg:rpm/redhat/tb-mqtt-transport@4.4.1-1?arch=noarch";
-        Boms.component(os, rpm, rpm);
+        Boms.component(os, rpm, rpm).put("name", "tb-mqtt-transport");
 
         JsonNode described = SbomImage.describe(os, image(), List.of(debComponent()));
 
         assertThat(SbomChecks.componentRefs(described)).contains(rpm).doesNotContain(SCANNED_DEB);
+    }
+
+    @Test
+    void failsWhenTheImageInstallsAnotherVersionOfThePackage() {
+        ObjectNode os = osSbom();
+        removeComponent(os, SCANNED_DEB);
+        osPackage(os, SCANNED_DEB.replace("4.4.1-1", "4.4.0-1"), "tb-mqtt-transport", "4.4.0-1");
+
+        assertThatThrownBy(() -> SbomImage.describe(os, image(), List.of(debComponent())))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("The image installs tb-mqtt-transport 4.4.0-1, but the SBOM of " + DEB_PURL + " is for 4.4.1-1");
+    }
+
+    @Test
+    void thePackageIsMatchedByThePurlNameNotTheComponentName() throws IOException {
+        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
+        SbomPackage.writeFor(applicationSbom, "mqtt", "4.4.1", new PackageFile("deb", deb.toFile(), DEB_PURL, false), List.of());
+
+        JsonNode described = describe();
+
+        assertThat(SbomChecks.componentRefs(described)).contains(DEB_PURL).doesNotContain(SCANNED_DEB);
+    }
+
+    @Test
+    void aDependencyCycleNothingElseDependsOnIsReachableFromTheImage() {
+        ObjectNode os = osSbom();
+        String jre17 = "pkg:deb/debian/openjdk-17-jre-headless@17.0.16?arch=amd64&distro=debian-13.7&package-id=1111111111111111";
+        String certificates = "pkg:deb/debian/ca-certificates-java@20240118?arch=all&distro=debian-13.7&package-id=2222222222222222";
+        osPackage(os, jre17, "openjdk-17-jre-headless", "17.0.16");
+        osPackage(os, certificates, "ca-certificates-java", "20240118");
+        Boms.dependency(os, jre17, certificates);
+        Boms.dependency(os, certificates, jre17);
+
+        JsonNode described = SbomImage.describe(os, image(), List.of(debComponent()));
+
+        assertThat(Boms.graph(described).get(IMAGE_REF)).hasSize(4).containsAnyOf(jre17, certificates);
+        assertThat(Boms.reachable(described, IMAGE_REF)).containsAll(SbomChecks.componentRefs(described));
     }
 
     @Test

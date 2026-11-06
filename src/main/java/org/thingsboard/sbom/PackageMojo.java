@@ -41,12 +41,8 @@ public class PackageMojo extends AbstractMojo {
         List<BundledComponent> bundled = components == null ? List.of() : components;
         try {
             SbomPackage.checkConfig(packages, bundled);
-            for (PackageFile packageFile : packages) {
-                if (packageFile.isSkip()) {
-                    getLog().info("Skipping package SBOM for " + packageFile.getId());
-                    continue;
-                }
-                Path output = SbomPackage.writeFor(sourceFile.toPath(), name, version, packageFile, bundled);
+            packages.stream().filter(PackageFile::isSkip).forEach(packageFile -> getLog().info("Skipping package SBOM for " + packageFile.getId()));
+            for (Path output : SbomPackage.writeAll(sourceFile.toPath(), name, version, packages, bundled)) {
                 getLog().info("Wrote package SBOM " + output);
             }
         } catch (SbomException e) {

@@ -35,6 +35,7 @@
         <maven.version>3.9.16</maven.version>
         <maven-plugin-tools.version>3.15.2</maven-plugin-tools.version>
         <cyclonedx-core-java.version>13.2.0</cyclonedx-core-java.version>
+        <packageurl-java.version>1.5.0</packageurl-java.version>
         <jackson.version>2.22.2</jackson.version>
         <junit.version>5.14.4</junit.version>
         <assertj.version>3.27.7</assertj.version>
@@ -88,6 +89,11 @@
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-core-java</artifactId>
             <version>${cyclonedx-core-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.package-url</groupId>
+            <artifactId>packageurl-java</artifactId>
+            <version>${packageurl-java.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

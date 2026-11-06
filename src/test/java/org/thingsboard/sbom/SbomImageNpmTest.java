@@ -292,4 +292,52 @@ class SbomImageNpmTest {
                 .hasMessageContaining("has the unresolved property in ${chromium.version}");
     }
 
+    @Test
+    void failsOnAScannedComponentWithoutPurlInTheInstallDir() throws IOException {
+        ObjectNode scan = scan(LZ4_ARM64);
+        String ref = scanned(scan, "", APP_DIR + "/node_modules/unknown/package.json");
+        ((ObjectNode) SbomPackageTest.component(scan, ref)).remove("purl");
+
+        assertThatThrownBy(() -> SbomImage.describe(scan, image("arm64"), List.of(app(appSbom()))))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("The image has a component without a purl at " + APP_DIR + "/node_modules/unknown/package.json");
+    }
+
+    @Test
+    void failsOnAnUnresolvedSupplierValue() {
+        BundledComponent component = new BundledComponent("application", "chrome", "1.0", null)
+                .supplier(new Organization("${vendor}", List.of(), List.of()));
+
+        assertThatThrownBy(() -> SbomImage.describe(scan(), image("arm64"), List.of(component)))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("has the unresolved property in ${vendor}");
+    }
+
+    @Test
+    void failsWhenAComponentSetsPackages() {
+        BundledComponent component = new BundledComponent("application", "chrome", "1.0", null).packages(List.of("deb"));
+
+        assertThatThrownBy(() -> SbomImage.describe(scan(), image("arm64"), List.of(component)))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled component chrome@1.0 sets packages, which only apply to package SBOMs");
+    }
+
+    @Test
+    void failsWhenAComponentIsDeclaredTwice() {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "chrome", "1.0", null), new BundledComponent("application", "chrome", "1.0", null));
+
+        assertThatThrownBy(() -> SbomImage.describe(scan(), image("arm64"), components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled component chrome@1.0 is declared more than once");
+    }
+
+    @Test
+    void failsWhenAnSbomComponentSetsDetailsOfItsOwn() throws IOException {
+        BundledComponent component = app(appSbom()).license("MIT");
+
+        assertThatThrownBy(() -> SbomImage.describe(scan(), image("arm64"), List.of(component)))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("takes its details from its SBOM and must not set [license]");
+    }
+
 }

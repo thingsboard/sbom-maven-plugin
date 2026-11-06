@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.packageurl.MalformedPackageURLException;
+import com.github.packageurl.PackageURL;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -48,7 +50,7 @@ public final class SbomImage {
     public static ObjectNode describe(JsonNode os, Image image, List<BundledComponent> components) {
         checkImage(image);
         check(components != null && !components.isEmpty(), "No bundled components configured: the image SBOM needs the SBOM of what the image installs");
-        components.forEach(SbomImage::checkComponent);
+        BundledComponents.check(components, BundledComponents.Goal.IMAGE);
         SbomChecks.checkInput("OS", os);
         String specVersion = os.path("specVersion").asText();
         List<Bundled> included = components.stream()
@@ -121,6 +123,13 @@ public final class SbomImage {
             rootDependsOn.add(component.ref());
             component.dependencies().forEach((ref, targets) -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()).addAll(targets));
         }
+        Set<String> reachableFromRoot = SbomPackage.reachableFrom(rootRef, graph);
+        for (String ref : osTargets) {
+            if (componentsByRef.containsKey(ref) && !reachableFromRoot.contains(ref)) {
+                rootDependsOn.add(ref);
+                reachableFromRoot.addAll(SbomPackage.reachableFrom(ref, graph));
+            }
+        }
         componentsByRef.keySet().forEach(ref -> graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()));
         ArrayNode dependencies = bom.putArray("dependencies");
         graph.forEach((ref, targets) -> {
@@ -140,51 +149,32 @@ public final class SbomImage {
         return bom;
     }
 
-    private static void checkComponent(BundledComponent component) {
-        List<String> anchors = new ArrayList<>();
-        if (component.getFile() != null) {
-            anchors.add("file");
-        }
-        if (component.getInstallDir() != null) {
-            anchors.add("installDir");
-        }
-        if (component.getBundleDir() != null) {
-            anchors.add("bundleDir");
-        }
-        if (component.getSbom() == null) {
-            check(component.getName() != null && !component.getName().isBlank(), "A bundled component has no name");
-            check(component.getInstallDir() == null && component.getBundleDir() == null,
-                    "Bundled component " + component.ref() + " sets installDir or bundleDir, which need an SBOM to check the image against");
-        } else {
-            check(anchors.size() == 1, "Bundled component " + component.ref() + " must set exactly one of file, installDir and bundleDir to check its SBOM against, but sets "
-                    + anchors);
-        }
-        for (String dir : Stream.of(component.getInstallDir(), component.getBundleDir()).filter(Objects::nonNull).toList()) {
-            check(dir.startsWith("/") && !dir.endsWith("/") && !dir.contains("//"),
-                    "Bundled component " + component.ref() + " has the directory " + dir + ", which must be an absolute path in the image without a trailing slash");
-        }
-        Stream.of(component.getType(), component.getGroup(), component.getName(), component.getVersion(), component.getDescription(), component.getPurl(),
-                        component.getCpe(), component.getLicense(), component.getInstallDir(), component.getBundleDir(),
-                        component.getFile() == null ? null : component.getFile().getPath(), component.getSbom() == null ? null : component.getSbom().getPath())
-                .filter(Objects::nonNull)
-                .forEach(value -> check(!value.contains("${"), "Bundled component " + component.ref() + " has the unresolved property in " + value
-                        + "; pass it on the command line or load it before the image goal runs"));
-    }
-
     private static void replaceOsPackages(JsonNode os, List<Bundled> included, Map<String, String> replaced) {
         for (Bundled component : included) {
-            String type = purlType(component.json().path("purl").asText());
-            if (component.config().getFile() == null || !OS_PACKAGE_TYPES.contains(type)) {
+            PackageURL purl = parsePurl(component.json().path("purl").asText());
+            if (component.config().getFile() == null || purl == null || !OS_PACKAGE_TYPES.contains(purl.getType())) {
                 continue;
             }
-            String name = component.json().path("name").asText();
-            List<String> matches = componentStream(os)
-                    .filter(osComponent -> type.equals(purlType(osComponent.path("purl").asText())) && name.equals(osComponent.path("name").asText()))
-                    .map(osComponent -> osComponent.path("bom-ref").asText())
+            List<JsonNode> matches = componentStream(os)
+                    .filter(osComponent -> {
+                        PackageURL scanned = parsePurl(osComponent.path("purl").asText());
+                        return scanned != null && purl.getType().equals(scanned.getType()) && purl.getName().equals(scanned.getName());
+                    })
                     .toList();
-            check(matches.size() == 1, "The OS SBOM should list " + name + " as one installed " + type + " package, but lists it "
+            check(matches.size() == 1, "The OS SBOM should list " + purl.getName() + " as one installed " + purl.getType() + " package, but lists it "
                     + matches.size() + " times; check that the image installs the package the SBOM was built for");
-            replaced.put(matches.get(0), component.ref());
+            String scannedVersion = parsePurl(matches.get(0).path("purl").asText()).getVersion();
+            check(Objects.equals(purl.getVersion(), scannedVersion), "The image installs " + purl.getName() + " " + scannedVersion + ", but the SBOM of "
+                    + component.ref() + " is for " + purl.getVersion() + "; check that the image installs the package the SBOM was built for");
+            replaced.put(matches.get(0).path("bom-ref").asText(), component.ref());
+        }
+    }
+
+    private static PackageURL parsePurl(String purl) {
+        try {
+            return purl.isEmpty() ? null : new PackageURL(purl);
+        } catch (MalformedPackageURLException e) {
+            return null;
         }
     }
 
@@ -260,6 +250,7 @@ public final class SbomImage {
         }
 
         String claim(String relative, String purl, String location) {
+            check(!purl.isEmpty(), "The image has a component without a purl at " + location + ", so it cannot be checked against the SBOM of " + ref());
             String ref = config.getBundleDir() != null ? listedRef(purl) : installedRef(packagePath(relative), purl, location);
             check(ref != null, "The image has " + purl + " at " + location + ", which the SBOM of " + ref() + " does not list");
             return ref;
@@ -414,7 +405,7 @@ public final class SbomImage {
             componentsByRef.put(ref, component);
             return;
         }
-        check(!component.path("purl").asText().isEmpty() && known.path("purl").asText().equals(component.path("purl").asText()),
+        check(SbomPackage.sameComponent(known, component),
                 "Component " + ref + " from " + source + " clashes with a different component that is already in the SBOM");
     }
 
@@ -424,14 +415,6 @@ public final class SbomImage {
 
     private static String remap(String ref, Map<String, String> replaced) {
         return replaced.getOrDefault(ref, ref);
-    }
-
-    private static String purlType(String purl) {
-        if (!purl.startsWith("pkg:")) {
-            return "";
-        }
-        int slash = purl.indexOf('/');
-        return slash < 0 ? "" : purl.substring(4, slash);
     }
 
     private static String withoutQualifiers(String purl) {
