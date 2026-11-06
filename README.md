@@ -220,7 +220,10 @@ The build fails, and the target file is left untouched, when any of these does n
 ./mvnw verify
 ```
 
-Unit tests validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers); they are skipped when Docker is not available. Integration tests in `src/it` run the plugin together with `cyclonedx-maven-plugin` on small projects.
+`./mvnw test` runs the unit tests, which need no Docker. `verify` also runs two kinds of integration tests:
+
+- `*IT` classes in `src/test/java`, run by Failsafe, validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers). They are skipped when Docker is not available, and with `-DskipITs`.
+- The projects in `src/it`, run by Invoker, build small projects with the plugin and `cyclonedx-maven-plugin`. They are skipped with `-Dinvoker.skip`.
 
 ## License
 

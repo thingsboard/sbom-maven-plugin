@@ -23,7 +23,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers(disabledWithoutDocker = true)
-class CycloneDxCliValidationTest {
+class CycloneDxCliValidationIT {
 
     private static final DockerImageName CLI_IMAGE = DockerImageName.parse("cyclonedx/cyclonedx-cli:0.33.1");
 
@@ -69,7 +69,7 @@ class CycloneDxCliValidationTest {
         Path registry = Files.createDirectory(tempDir.resolve("registry"));
         Files.writeString(registry.resolve("3.xml"), "<LWM2M/>");
         Path certificate = tempDir.resolve("root-ca.crt.pem");
-        try (InputStream in = CycloneDxCliValidationTest.class.getResourceAsStream("/fixtures/root-ca.crt.pem")) {
+        try (InputStream in = CycloneDxCliValidationIT.class.getResourceAsStream("/fixtures/root-ca.crt.pem")) {
             Files.copy(in, certificate);
         }
         List<BundledComponent> components = List.of(
