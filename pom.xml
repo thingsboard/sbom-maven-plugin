@@ -57,21 +57,30 @@
     </prerequisites>
 
     <properties>
+        <!-- BUILD SETTINGS -->
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Fixed so every build of the same sources produces identical artifacts; revisit when a release process is defined -->
         <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
+
+        <!-- MAVEN API: what the plugin compiles against -->
         <!-- Minimum supported Maven: the oldest version shipped by the last two Ubuntu LTS releases (24.04: 3.8.7, 26.04: 3.9.12). The plugin compiles against it and declares it in <prerequisites>. -->
         <maven-api.version>3.8.7</maven-api.version>
         <maven-plugin-tools.version>3.16.0</maven-plugin-tools.version>
+
+        <!-- DECLARED DEPENDENCIES: artifacts this project depends on directly, or the BOMs that manage them -->
         <cyclonedx-core-java.version>13.4.0</cyclonedx-core-java.version>
         <packageurl-java.version>1.5.0</packageurl-java.version>
         <jackson.version>2.22.4</jackson.version>
-        <slf4j.version>2.0.20</slf4j.version>
-        <commons-lang3.version>3.18.0</commons-lang3.version>
         <junit.version>6.1.3</junit.version>
         <assertj.version>3.27.7</assertj.version>
         <testcontainers.version>2.0.5</testcontainers.version>
+
+        <!-- CONFLICT PINS: never declared, managed only to force one version where the graph disagrees (reasons in dependencyManagement) -->
+        <slf4j.version>2.0.20</slf4j.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+
+        <!-- BUILD PLUGINS -->
         <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
         <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
@@ -87,11 +96,14 @@
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
+
+        <!-- INTEGRATION TESTS: plugins the projects in src/it build with -->
         <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- BOMs -->
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
@@ -120,6 +132,8 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- CONFLICT PINS: never declared, managed only to force one version where the graph disagrees -->
             <!-- Testcontainers and docker-java pull different SLF4J versions into the tests -->
             <dependency>
                 <groupId>org.slf4j</groupId>
