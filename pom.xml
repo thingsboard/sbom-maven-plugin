@@ -94,6 +94,8 @@
         <maven-artifact-plugin.version>3.7.0</maven-artifact-plugin.version>
         <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
+        <!-- 1.9.0 requires Maven 3.9; stay on 1.8.x while maven-api.version is below that -->
+        <flatten-maven-plugin.version>1.8.0</flatten-maven-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-failsafe-plugin.version>3.6.1</maven-failsafe-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
@@ -438,6 +440,29 @@
                         <configuration>
                             <helpPackageName>org.thingsboard.sbom</helpPackageName>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <!-- Publishes a POM without build configuration, properties, test dependencies or BOM imports -->
+                <configuration>
+                    <!-- Keeps the project metadata, prerequisites, SCM and issue tracker -->
+                    <flattenMode>oss</flattenMode>
+                    <!-- Lists the whole runtime classpath at the versions resolved here: without the dependencyManagement,
+                         Maven would otherwise resolve some transitive versions differently when it loads the plugin -->
+                    <flattenDependencyMode>all</flattenDependencyMode>
+                    <outputDirectory>${project.build.directory}</outputDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten-pom</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
