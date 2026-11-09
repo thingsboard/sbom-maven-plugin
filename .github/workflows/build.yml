@@ -23,8 +23,8 @@ jobs:
             # SHA-256 of apache-maven-3.8.7-bin.zip, checked against the SHA-512 Apache publishes
             maven-sha256: '70f7fec785728560e5382f1f17fbd8d9dfab391bf87b29cad1a60e54e60b2a7a'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
