@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,6 +12,10 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
@@ -30,19 +35,36 @@ jobs:
             maven-sha256: '70f7fec785728560e5382f1f17fbd8d9dfab391bf87b29cad1a60e54e60b2a7a'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: maven
+          cache-read-only: ${{ !matrix.rebuild }}
       - name: Switch the Maven Wrapper to Maven ${{ matrix.maven }}
         if: matrix.maven
         run: ./mvnw -B -ntp -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
-      - run: ./mvnw -B -ntp -V install
+      - name: Build and test
+        run: ./mvnw -B -ntp -V install 2>&1 | tee "$RUNNER_TEMP/build.log"
         timeout-minutes: 15
       - name: Check that a rebuild produces identical artifacts
         if: matrix.rebuild
-        run: ./mvnw -B -ntp clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip
+        env:
+          TZ: Pacific/Kiritimati
+          LC_ALL: C
+          MAVEN_OPTS: -Duser.language=tr -Duser.country=TR
+        run: ./mvnw -B -ntp clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip 2>&1 | tee "$RUNNER_TEMP/rebuild.log"
+      - name: Add the build errors to the job summary
+        if: failure()
+        run: |
+          {
+            echo '### Build errors'
+            echo '```'
+            cat "$RUNNER_TEMP"/build.log "$RUNNER_TEMP"/rebuild.log 2>/dev/null | grep -m 200 '^\[ERROR\]' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the test reports and integration test logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
