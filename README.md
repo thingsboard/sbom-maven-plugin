@@ -249,6 +249,7 @@ If the script stops, its last message says what to do:
 - **Finish the release by hand** when it stops after the PR is merged. From the same clone, run the steps that have not run yet:
 
   ```
+  git fetch origin main && git merge-base --is-ancestor v1.0.0 origin/main   # must succeed: else don't push the tag, start over
   git push origin v1.0.0
   ./mvnw release:perform
   gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0 target/checkout/target/sbom-maven-plugin-1.0.0.jar

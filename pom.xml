@@ -558,6 +558,7 @@
         </plugins>
     </build>
 
+    <!-- release.sh checks ~/.m2/settings.xml for this repository id: change DEPLOY_SERVER_ID there along with it -->
     <distributionManagement>
         <repository>
             <id>thingsboard-repo-deploy</id>

@@ -60,20 +60,22 @@ for _ in $(seq 30); do
     [ $? -eq 8 ] && break # 8: checks pending
     sleep 5
 done
-gh pr checks "$pr_url" --watch --fail-fast || die "the PR checks failed: see $pr_url"
+gh pr checks "$pr_url" --watch --fail-fast || die "the PR checks failed on $pr_url; nothing is published: fix the cause on main and see \"Releasing\" in README.md to start over"
 
 step "Waiting for the PR to be merged: merge $pr_url (merge commit) to continue"
 while :; do
     state=$(gh pr view "$pr_url" --json state --jq .state) \
         || die "could not read the state of $pr_url: once it is merged, finish the release by hand: see \"Releasing\" in README.md"
     [ "$state" = MERGED ] && break
-    [ "$state" = CLOSED ] && die "the PR was closed without merging"
+    [ "$state" = CLOSED ] && die "the PR was closed without merging; nothing is published: see \"Releasing\" in README.md to start over"
     sleep 10
 done
 
+# From here on, "Finish the release by hand" in README.md repeats these steps: keep the two in sync
 step "Pushing $tag"
 git fetch --quiet origin main || die "fetching main failed: finish the release by hand: see \"Releasing\" in README.md"
-git merge-base --is-ancestor "$tag" origin/main || die "$tag is not in main's history: was the PR squashed or rebased?"
+git merge-base --is-ancestor "$tag" origin/main \
+    || die "$tag is not in main's history (was the PR squashed or rebased?): do not push it; delete the local $tag tag and $branch branch, then run release.sh again"
 git push origin "refs/tags/$tag" || die "pushing $tag failed: finish the release by hand: see \"Releasing\" in README.md"
 
 step "Building $tag and deploying it to $DEPLOY_SERVER_ID"
