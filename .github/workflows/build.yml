@@ -35,3 +35,11 @@ jobs:
       - name: Keep the locally installed plugin out of the Maven cache
         if: always()
         run: rm -rf ~/.m2/repository/org/thingsboard/sbom-maven-plugin
+
+  ci:
+    name: CI
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.build.result }}" = success
