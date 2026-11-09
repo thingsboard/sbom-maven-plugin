@@ -28,9 +28,8 @@ cd "$(dirname "$0")"
 step "Checking the environment"
 command -v gh >/dev/null || die "the GitHub CLI (gh) is required"
 gh auth status >/dev/null 2>&1 || die "gh is not logged in: run 'gh auth login'"
-settings=${MAVEN_SETTINGS:-$HOME/.m2/settings.xml}
-grep -q "<id>$DEPLOY_SERVER_ID</id>" "$settings" 2>/dev/null \
-    || die "$settings has no <server> with id $DEPLOY_SERVER_ID: release:perform could not deploy"
+grep -q "<id>$DEPLOY_SERVER_ID</id>" ~/.m2/settings.xml 2>/dev/null \
+    || die "~/.m2/settings.xml has no <server> with id $DEPLOY_SERVER_ID: release:perform could not deploy"
 [ "$(git branch --show-current)" = main ] || die "run this from the main branch"
 [ -z "$(git status --porcelain)" ] || die "the working tree has changes"
 git fetch --quiet origin main
