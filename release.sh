@@ -35,13 +35,11 @@ grep -q "<id>$DEPLOY_SERVER_ID</id>" ~/.m2/settings.xml 2>/dev/null \
 git fetch --quiet origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "main is not up to date with origin/main"
 ! git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || die "tag $tag already exists locally"
-[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ] || die "tag $tag already exists on GitHub"
-[ -z "$(git ls-remote --heads origin "refs/heads/$branch")" ] || die "branch $branch already exists on GitHub"
+[ -z "$(git ls-remote origin "refs/tags/$tag" "refs/heads/$branch")" ] || die "tag $tag or branch $branch already exists on GitHub"
 
 step "Preparing $tag on $branch"
 git switch --create "$branch"
-./mvnw -B release:clean
-./mvnw -B release:prepare -Dresume=false -DreleaseVersion="$version" ${next_version:+-DdevelopmentVersion="$next_version"}
+./mvnw -B release:prepare -Dresume=false -DreleaseVersion="$version" -Dtag="$tag" ${next_version:+-DdevelopmentVersion="$next_version"}
 git log --oneline -2
 
 step "Opening the release PR"
@@ -80,7 +78,6 @@ gh release create "$tag" --verify-tag --generate-notes --title "$tag" \
     "target/checkout/target/sbom-maven-plugin-$version.jar"
 
 step "Cleaning up"
-./mvnw -B -q release:clean
 git switch main
 git pull --ff-only --quiet
 git branch --delete "$branch"

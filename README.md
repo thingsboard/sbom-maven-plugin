@@ -241,7 +241,7 @@ The next development version is optional and defaults to the next patch version.
 4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
 5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
 
-The release builds skip the tests, since CI has run them on the PR. Before the tag is pushed nothing is published: to start over, close the PR, then delete the `release/1.0.0` branch, the local tag and `release.properties` (`./mvnw release:clean`). After `release:perform` the version is in Artifactory and cannot be deployed again.
+The release builds skip the tests, since CI has run them on the PR. Before the tag is pushed nothing is published: to start over, close the PR, then delete the `release/1.0.0` branch and the local tag. After `release:perform` the version is in Artifactory and cannot be deployed again.
 
 Every commit sets `project.build.outputTimestamp`, so any of them, release tags included, can be rebuilt into identical artifacts.
 

@@ -312,7 +312,6 @@
                     <artifactId>maven-release-plugin</artifactId>
                     <version>${maven-release-plugin.version}</version>
                     <configuration>
-                        <tagNameFormat>v@{project.version}</tagNameFormat>
                         <scmReleaseCommitComment>chore: release @{releaseLabel}</scmReleaseCommitComment>
                         <scmDevelopmentCommitComment>chore: start development after @{releaseLabel}</scmDevelopmentCommitComment>
                         <!-- main takes changes only through PRs: release.sh pushes the commits as a PR branch, and the tag once the PR is merged -->
