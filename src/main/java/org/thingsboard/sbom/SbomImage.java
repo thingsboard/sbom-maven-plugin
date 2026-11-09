@@ -36,14 +36,14 @@ public final class SbomImage {
     private static final String PACKAGE_PATH = "cdx:npm:package:path";
     private static final String MANIFEST = "package.json";
 
-    private SbomImage() {
-    }
+    private SbomImage() {}
 
     public record Image(String repository, String tag, String digest, String architecture) {
 
         String purl() {
             return "pkg:docker/" + repository + "@" + digest.replace(":", "%3A") + "?arch=" + architecture;
         }
+
     }
 
     public static void write(Path osSbom, Image image, List<BundledComponent> components, Path output) {
@@ -170,8 +170,7 @@ public final class SbomImage {
         }
     }
 
-    private record ScannedPackage(String ref, PackageURL purl) {
-    }
+    private record ScannedPackage(String ref, PackageURL purl) {}
 
     private static PackageURL parsePurl(String purl) {
         try {
@@ -350,6 +349,7 @@ public final class SbomImage {
             purls.remove("");
             return purls;
         }
+
     }
 
     private static void checkImage(Image image) {

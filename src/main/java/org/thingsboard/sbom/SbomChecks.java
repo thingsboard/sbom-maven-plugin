@@ -23,8 +23,7 @@ import java.util.stream.Collectors;
 
 final class SbomChecks {
 
-    private SbomChecks() {
-    }
+    private SbomChecks() {}
 
     static void checkInput(String label, JsonNode bom) {
         check(bom != null && bom.isObject(), label + " SBOM is not a JSON object");

@@ -22,8 +22,7 @@ final class Boms {
     static final ObjectMapper MAPPER = new ObjectMapper();
     static final String HOST_PREFIX = "pkg:maven/org.thingsboard/ui-ngx@";
 
-    private Boms() {
-    }
+    private Boms() {}
 
     static ObjectNode fixture(String name) {
         try (InputStream in = Boms.class.getResourceAsStream("/fixtures/" + name)) {

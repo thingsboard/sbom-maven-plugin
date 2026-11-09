@@ -19,8 +19,7 @@ public final class SbomMetadata {
 
     private static final BigDecimal MIN_SPEC_VERSION = new BigDecimal("1.6");
 
-    private SbomMetadata() {
-    }
+    private SbomMetadata() {}
 
     public static List<String> applyToFile(Path targetFile, Organization manufacturer, Organization supplier, Organization componentManufacturer) {
         JsonNode target = SbomFiles.readFile(targetFile);

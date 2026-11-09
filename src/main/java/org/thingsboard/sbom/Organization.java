@@ -11,10 +11,9 @@ public class Organization {
     private List<String> urls = new ArrayList<>();
     private List<Contact> contacts = new ArrayList<>();
 
-    public Organization() {
-    }
+    public Organization() {}
 
-    public Organization(String name, List<String> urls, List<Contact> contacts) {
+    Organization(String name, List<String> urls, List<Contact> contacts) {
         this.name = name;
         this.urls = urls;
         this.contacts = contacts;

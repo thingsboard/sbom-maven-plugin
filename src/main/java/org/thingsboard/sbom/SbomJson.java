@@ -16,8 +16,7 @@ import static org.thingsboard.sbom.SbomChecks.check;
 
 final class SbomJson {
 
-    private SbomJson() {
-    }
+    private SbomJson() {}
 
     static ObjectNode newBom(String specVersion, String serialSeed) {
         ObjectNode bom = JsonNodeFactory.instance.objectNode();
