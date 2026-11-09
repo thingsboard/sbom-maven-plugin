@@ -295,6 +295,7 @@
                     <artifactId>maven-wrapper-plugin</artifactId>
                     <version>${maven-wrapper-plugin.version}</version>
                 </plugin>
+                <!-- Not run here: declares the version the src/it projects use, so Dependabot updates it -->
                 <plugin>
                     <groupId>org.cyclonedx</groupId>
                     <artifactId>cyclonedx-maven-plugin</artifactId>
