@@ -46,7 +46,8 @@ jobs:
       - name: Switch the Maven Wrapper to Maven ${{ matrix.maven }}
         if: matrix.maven
         run: ./mvnw -B -ntp -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
-      - run: ./mvnw -B -ntp -V install 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Build and test
+        run: ./mvnw -B -ntp -V install 2>&1 | tee "$RUNNER_TEMP/build.log"
         timeout-minutes: 15
       - name: Check that a rebuild produces identical artifacts
         if: matrix.rebuild
