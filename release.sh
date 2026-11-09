@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+#
+# SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Releases the plugin: see "Releasing" in README.md.
+# Usage: ./release.sh <release version> [<next development version>]
+# Example: ./release.sh 1.0.0 1.0.1-SNAPSHOT
+
+set -euo pipefail
+
+# The <distributionManagement> repository id in pom.xml
+readonly DEPLOY_SERVER_ID=thingsboard-repo-deploy
+
+step() { printf '\n==> %s\n' "$*"; }
+die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
+
+[ $# -ge 1 ] && [ $# -le 2 ] || die "usage: $0 <release version> [<next development version>]"
+readonly version=$1 next_version=${2:-}
+readonly tag=v$version branch=release/$version
+
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "release version must look like 1.2.3, got '$version'"
+[ -z "$next_version" ] || [[ $next_version =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]] \
+    || die "next development version must look like 1.2.4-SNAPSHOT, got '$next_version'"
+
+cd "$(dirname "$0")"
+
+step "Checking the environment"
+command -v gh >/dev/null || die "the GitHub CLI (gh) is required"
+gh auth status >/dev/null 2>&1 || die "gh is not logged in: run 'gh auth login'"
+grep -q "<id>$DEPLOY_SERVER_ID</id>" ~/.m2/settings.xml 2>/dev/null \
+    || die "~/.m2/settings.xml has no <server> with id $DEPLOY_SERVER_ID: release:perform could not deploy"
+[ "$(git branch --show-current)" = main ] || die "run this from the main branch"
+[ -z "$(git status --porcelain)" ] || die "the working tree has changes"
+git fetch --quiet origin main
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "main is not up to date with origin/main"
+! git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || die "tag $tag already exists locally"
+[ -z "$(git ls-remote origin "refs/tags/$tag" "refs/heads/$branch")" ] || die "tag $tag or branch $branch already exists on GitHub"
+
+step "Preparing $tag on $branch"
+git switch --create "$branch"
+./mvnw -B release:prepare -Dresume=false -DreleaseVersion="$version" -Dtag="$tag" ${next_version:+-DdevelopmentVersion="$next_version"} \
+    || die "release:prepare failed; nothing is pushed: see \"Releasing\" in README.md to start over"
+git log --oneline -2
+
+step "Opening the release PR"
+# --no-follow-tags: the release tag must not reach GitHub before the PR is merged
+git push --no-follow-tags --set-upstream origin "$branch" \
+    || die "pushing $branch failed; nothing is published: see \"Releasing\" in README.md to start over"
+pr_url=$(gh pr create --base main --head "$branch" --title "chore: release $tag" \
+    --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.") \
+    || die "opening the PR for $branch failed; nothing is published: open it by hand, or see \"Releasing\" in README.md to start over"
+echo "$pr_url"
+
+step "Waiting for the PR checks"
+# The checks take a few seconds to show up after the PR is opened
+for _ in $(seq 30); do
+    gh pr checks "$pr_url" >/dev/null 2>&1 && break
+    [ $? -eq 8 ] && break # 8: checks pending
+    sleep 5
+done
+gh pr checks "$pr_url" --watch --fail-fast || die "the PR checks failed on $pr_url; nothing is published: fix the cause on main and see \"Releasing\" in README.md to start over"
+
+step "Waiting for the PR to be merged: merge $pr_url (merge commit) to continue"
+while :; do
+    state=$(gh pr view "$pr_url" --json state --jq .state) \
+        || die "could not read the state of $pr_url: once it is merged, finish the release by hand: see \"Releasing\" in README.md"
+    [ "$state" = MERGED ] && break
+    [ "$state" = CLOSED ] && die "the PR was closed without merging; nothing is published: see \"Releasing\" in README.md to start over"
+    sleep 10
+done
+
+# From here on, "Finish the release by hand" in README.md repeats these steps: keep the two in sync
+step "Pushing $tag"
+git fetch --quiet origin main || die "fetching main failed: finish the release by hand: see \"Releasing\" in README.md"
+git merge-base --is-ancestor "$tag" origin/main \
+    || die "$tag is not in main's history (was the PR squashed or rebased?): do not push it; delete the local $tag tag and $branch branch, then run release.sh again"
+git push origin "refs/tags/$tag" || die "pushing $tag failed: finish the release by hand: see \"Releasing\" in README.md"
+
+step "Building $tag and deploying it to $DEPLOY_SERVER_ID"
+./mvnw -B release:perform \
+    || die "release:perform failed after $tag was pushed: fix the cause, then finish the release by hand: see \"Releasing\" in README.md"
+
+step "Creating the GitHub Release"
+gh release create "$tag" --verify-tag --generate-notes --title "$tag" \
+    "target/checkout/target/sbom-maven-plugin-$version.jar" \
+    || die "$tag is deployed but the GitHub Release was not created: finish the release by hand: see \"Releasing\" in README.md"
+
+step "Cleaning up"
+{ git switch main && git pull --ff-only --quiet && git branch --delete "$branch"; } \
+    || die "$tag is released, but cleaning up failed: switch to main, pull it and delete the local $branch branch by hand"
+
+step "Released $tag"

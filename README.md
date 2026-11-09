@@ -225,6 +225,41 @@ The build fails, and the target file is left untouched, when any of these does n
 - `*IT` classes in `src/test/java`, run by Failsafe, validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers). They are skipped when Docker is not available, and with `-DskipITs`.
 - The projects in `src/it`, run by Invoker, build small projects with the plugin and `cyclonedx-maven-plugin`. They are skipped with `-Dinvoker.skip`.
 
+## Releasing
+
+Releases are deployed to `https://repo.thingsboard.io/artifactory/libs-release-public` by the release manager, whose `~/.m2/settings.xml` holds the credentials of the `thingsboard-repo-deploy` server. From an up-to-date `main`:
+
+```
+./release.sh 1.0.0 1.0.1-SNAPSHOT
+```
+
+The next development version is optional and defaults to the next patch version. The script stops at the first failure, and:
+
+1. Runs `release:prepare` on a new `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
+2. Pushes the branch, opens a PR and waits for its checks.
+3. Waits for the PR to be merged. `main` takes only merge commits, so the tagged commit stays in its history.
+4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
+5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
+
+The release builds skip the tests, since CI has run them on the PR.
+
+If the script stops, its last message says what to do:
+
+- **Start over** when it stops before the PR is merged: nothing is published yet. Close the PR if one was opened, run `git switch --discard-changes main`, then delete the `release/1.0.0` branch (locally and on GitHub) and the local `v1.0.0` tag.
+- **Finish the release by hand** when it stops after the PR is merged. From the same clone, run the steps that have not run yet:
+
+  ```
+  git fetch origin main && git merge-base --is-ancestor v1.0.0 origin/main   # must succeed: else don't push the tag, start over
+  git push origin v1.0.0
+  ./mvnw release:perform
+  gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0 target/checkout/target/sbom-maven-plugin-1.0.0.jar
+  git switch main && git pull --ff-only && git branch --delete release/1.0.0
+  ```
+
+  Once `release:perform` has deployed, the version is in Artifactory and cannot be deployed again.
+
+Every commit sets `project.build.outputTimestamp`, so any of them, release tags included, can be rebuilt into identical artifacts.
+
 ## License
 
 Apache License 2.0

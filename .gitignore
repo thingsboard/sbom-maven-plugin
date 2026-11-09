@@ -2,3 +2,7 @@ target/
 .idea/
 *.iml
 .claude/settings.local.json
+
+# maven-release-plugin working files
+release.properties
+pom.xml.releaseBackup
