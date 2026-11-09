@@ -241,7 +241,21 @@ The next development version is optional and defaults to the next patch version.
 4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
 5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
 
-The release builds skip the tests, since CI has run them on the PR. Before the tag is pushed nothing is published. To start over, close the PR if one was opened, run `git switch --discard-changes main`, then delete the `release/1.0.0` branch (locally and on GitHub) and the local `v1.0.0` tag. After `release:perform` the version is in Artifactory and cannot be deployed again.
+The release builds skip the tests, since CI has run them on the PR.
+
+If the script stops, its last message says what to do:
+
+- **Start over** when it stops before the PR is merged: nothing is published yet. Close the PR if one was opened, run `git switch --discard-changes main`, then delete the `release/1.0.0` branch (locally and on GitHub) and the local `v1.0.0` tag.
+- **Finish the release by hand** when it stops after the PR is merged. From the same clone, run the steps that have not run yet:
+
+  ```
+  git push origin v1.0.0
+  ./mvnw release:perform
+  gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0 target/checkout/target/sbom-maven-plugin-1.0.0.jar
+  git switch main && git pull --ff-only && git branch --delete release/1.0.0
+  ```
+
+  Once `release:perform` has deployed, the version is in Artifactory and cannot be deployed again.
 
 Every commit sets `project.build.outputTimestamp`, so any of them, release tags included, can be rebuilt into identical artifacts.
 

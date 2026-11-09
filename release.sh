@@ -10,6 +10,7 @@
 
 set -euo pipefail
 
+# The <distributionManagement> repository id in pom.xml
 readonly DEPLOY_SERVER_ID=thingsboard-repo-deploy
 
 step() { printf '\n==> %s\n' "$*"; }
@@ -44,9 +45,12 @@ git switch --create "$branch"
 git log --oneline -2
 
 step "Opening the release PR"
-git push --set-upstream origin "$branch"
+# --no-follow-tags: the release tag must not reach GitHub before the PR is merged
+git push --no-follow-tags --set-upstream origin "$branch" \
+    || die "pushing $branch failed; nothing is published: see \"Releasing\" in README.md to start over"
 pr_url=$(gh pr create --base main --head "$branch" --title "chore: release $tag" \
-    --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.")
+    --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.") \
+    || die "opening the PR for $branch failed; nothing is published: open it by hand, or see \"Releasing\" in README.md to start over"
 echo "$pr_url"
 
 step "Waiting for the PR checks"
@@ -60,29 +64,29 @@ gh pr checks "$pr_url" --watch --fail-fast || die "the PR checks failed: see $pr
 
 step "Waiting for the PR to be merged: merge $pr_url (merge commit) to continue"
 while :; do
-    state=$(gh pr view "$pr_url" --json state --jq .state)
+    state=$(gh pr view "$pr_url" --json state --jq .state) \
+        || die "could not read the state of $pr_url: once it is merged, finish the release by hand: see \"Releasing\" in README.md"
     [ "$state" = MERGED ] && break
     [ "$state" = CLOSED ] && die "the PR was closed without merging"
     sleep 10
 done
 
 step "Pushing $tag"
-git fetch --quiet origin main
+git fetch --quiet origin main || die "fetching main failed: finish the release by hand: see \"Releasing\" in README.md"
 git merge-base --is-ancestor "$tag" origin/main || die "$tag is not in main's history: was the PR squashed or rebased?"
-git push origin "refs/tags/$tag"
+git push origin "refs/tags/$tag" || die "pushing $tag failed: finish the release by hand: see \"Releasing\" in README.md"
 
 step "Building $tag and deploying it to $DEPLOY_SERVER_ID"
 ./mvnw -B release:perform \
-    || die "release:perform failed after $tag was pushed: fix the cause and run ./mvnw release:perform again"
+    || die "release:perform failed after $tag was pushed: fix the cause, then finish the release by hand: see \"Releasing\" in README.md"
 
 step "Creating the GitHub Release"
 gh release create "$tag" --verify-tag --generate-notes --title "$tag" \
     "target/checkout/target/sbom-maven-plugin-$version.jar" \
-    || die "$tag is deployed but the GitHub Release was not created: create it by hand"
+    || die "$tag is deployed but the GitHub Release was not created: finish the release by hand: see \"Releasing\" in README.md"
 
 step "Cleaning up"
-git switch main
-git pull --ff-only --quiet
-git branch --delete "$branch"
+{ git switch main && git pull --ff-only --quiet && git branch --delete "$branch"; } \
+    || die "$tag is released, but cleaning up failed: switch to main, pull it and delete the local $branch branch by hand"
 
 step "Released $tag"
