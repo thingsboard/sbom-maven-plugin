@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,9 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - java: '17'
-            rebuild: true
           - java: '25'
+            rebuild: true
           # The oldest Maven the plugin supports (see maven-api.version in pom.xml)
           - java: '17'
             maven: '3.8.7'
@@ -40,6 +39,7 @@ jobs:
         if: matrix.maven
         run: ./mvnw -B -ntp -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
       - run: ./mvnw -B -ntp -V install
+        timeout-minutes: 15
       - name: Check that a rebuild produces identical artifacts
         if: matrix.rebuild
         run: ./mvnw -B -ntp clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip
