@@ -53,6 +53,7 @@ jobs:
         env:
           TZ: Pacific/Kiritimati
           LC_ALL: C
+          MAVEN_OPTS: -Duser.language=tr -Duser.country=TR
         run: ./mvnw -B -ntp clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip 2>&1 | tee "$RUNNER_TEMP/rebuild.log"
       - name: Add the build errors to the job summary
         if: failure()
