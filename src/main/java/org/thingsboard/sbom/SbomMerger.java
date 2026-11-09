@@ -14,8 +14,7 @@ import java.util.Set;
 
 public final class SbomMerger {
 
-    private SbomMerger() {
-    }
+    private SbomMerger() {}
 
     public static int mergeFile(Path targetFile, Path source, String nestedResource, String hostPurlPrefix) {
         JsonNode target = SbomFiles.readFile(targetFile);

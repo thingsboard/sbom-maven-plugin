@@ -24,8 +24,7 @@ final class SbomFiles {
     private static final List<String> HASH_ALGORITHMS = List.of("SHA-256", "SHA-512");
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    private SbomFiles() {
-    }
+    private SbomFiles() {}
 
     static JsonNode readFile(Path file) {
         if (!Files.isRegularFile(file)) {

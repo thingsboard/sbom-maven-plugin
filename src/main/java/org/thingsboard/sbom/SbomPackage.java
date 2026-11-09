@@ -25,8 +25,7 @@ public final class SbomPackage {
 
     private static final String SBOM_SUFFIX = ".cdx.json";
 
-    private SbomPackage() {
-    }
+    private SbomPackage() {}
 
     public static List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
         List<PackageFile> included = packages.stream().filter(packageFile -> !packageFile.isSkip()).toList();

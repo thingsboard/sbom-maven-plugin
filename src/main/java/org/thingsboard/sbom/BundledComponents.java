@@ -31,11 +31,12 @@ import static org.thingsboard.sbom.SbomJson.putIfPresent;
 final class BundledComponents {
 
     enum Goal {
+
         PACKAGE, IMAGE
+
     }
 
-    private BundledComponents() {
-    }
+    private BundledComponents() {}
 
     static void validate(List<BundledComponent> components, Goal goal) {
         Set<String> refs = new HashSet<>();
@@ -139,8 +140,7 @@ final class BundledComponents {
         return new Resolved(ref, root, nested);
     }
 
-    record Resolved(String ref, ObjectNode json, JsonNode sbom) {
-    }
+    record Resolved(String ref, ObjectNode json, JsonNode sbom) {}
 
     private static ObjectNode toJson(BundledComponent component) {
         ObjectNode json = JsonNodeFactory.instance.objectNode();

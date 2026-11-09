@@ -133,7 +133,6 @@ class CycloneDxCliValidationIT {
         }
     }
 
-    private record CliResult(boolean passed, String logs) {
-    }
+    private record CliResult(boolean passed, String logs) {}
 
 }

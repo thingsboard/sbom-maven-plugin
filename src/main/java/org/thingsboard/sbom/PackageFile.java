@@ -11,10 +11,9 @@ public class PackageFile {
     private String purl;
     private boolean skip;
 
-    public PackageFile() {
-    }
+    public PackageFile() {}
 
-    public PackageFile(String id, File file, String purl, boolean skip) {
+    PackageFile(String id, File file, String purl, boolean skip) {
         this.id = id;
         this.file = file;
         this.purl = purl;

@@ -8,10 +8,9 @@ public class Contact {
     private String email;
     private String phone;
 
-    public Contact() {
-    }
+    public Contact() {}
 
-    public Contact(String name, String email, String phone) {
+    Contact(String name, String email, String phone) {
         this.name = name;
         this.email = email;
         this.phone = phone;
