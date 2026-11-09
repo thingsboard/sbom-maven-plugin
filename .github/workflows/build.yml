@@ -8,14 +8,21 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: build (${{ matrix.java }}${{ matrix.maven && format(', Maven {0}', matrix.maven) || '' }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         include:
           - java: '17'
+            rebuild: true
           - java: '25'
           # The oldest Maven the plugin supports (see maven-api.version in pom.xml)
           - java: '17'
@@ -31,10 +38,22 @@ jobs:
           cache: maven
       - name: Switch the Maven Wrapper to Maven ${{ matrix.maven }}
         if: matrix.maven
-        run: ./mvnw -B -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
-      - run: ./mvnw -B -V install
+        run: ./mvnw -B -ntp -q wrapper:wrapper -Dmaven=${{ matrix.maven }} -DdistributionSha256Sum=${{ matrix.maven-sha256 }}
+      - run: ./mvnw -B -ntp -V install
       - name: Check that a rebuild produces identical artifacts
-        run: ./mvnw -B clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip
+        if: matrix.rebuild
+        run: ./mvnw -B -ntp clean verify artifact:compare -DskipTests -DskipITs -Dinvoker.skip
+      - name: Upload the test reports and integration test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports-java-${{ matrix.java }}${{ matrix.maven && format('-maven-{0}', matrix.maven) || '' }}
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+            target/it/*/build.log
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Keep the locally installed plugin out of the Maven cache
         if: always()
         run: rm -rf ~/.m2/repository/org/thingsboard/sbom-maven-plugin
@@ -44,5 +63,6 @@ jobs:
     needs: build
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - run: test "${{ needs.build.result }}" = success
