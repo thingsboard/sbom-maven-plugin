@@ -94,7 +94,7 @@
         <maven-artifact-plugin.version>3.7.0</maven-artifact-plugin.version>
         <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
-        <!-- 1.9.0 requires Maven 3.9; stay on 1.8.x while maven-api.version is below that -->
+        <!-- 1.9.0 requires Maven 3.9; stay on 1.8.x while maven-api.version is below that. .github/dependabot.yml holds it back too: remove that ignore when this one goes -->
         <flatten-maven-plugin.version>1.8.0</flatten-maven-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-failsafe-plugin.version>3.6.1</maven-failsafe-plugin.version>
@@ -294,6 +294,12 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-wrapper-plugin</artifactId>
                     <version>${maven-wrapper-plugin.version}</version>
+                </plugin>
+                <!-- Not run here: declares the version the src/it projects use, so Dependabot updates it -->
+                <plugin>
+                    <groupId>org.cyclonedx</groupId>
+                    <artifactId>cyclonedx-maven-plugin</artifactId>
+                    <version>${cyclonedx-maven-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
