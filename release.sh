@@ -39,7 +39,8 @@ git fetch --quiet origin main
 
 step "Preparing $tag on $branch"
 git switch --create "$branch"
-./mvnw -B release:prepare -Dresume=false -DreleaseVersion="$version" -Dtag="$tag" ${next_version:+-DdevelopmentVersion="$next_version"}
+./mvnw -B release:prepare -Dresume=false -DreleaseVersion="$version" -Dtag="$tag" ${next_version:+-DdevelopmentVersion="$next_version"} \
+    || die "release:prepare failed; nothing is pushed: see \"Releasing\" in README.md to start over"
 git log --oneline -2
 
 step "Opening the release PR"
@@ -71,11 +72,13 @@ git merge-base --is-ancestor "$tag" origin/main || die "$tag is not in main's hi
 git push origin "refs/tags/$tag"
 
 step "Building $tag and deploying it to $DEPLOY_SERVER_ID"
-./mvnw -B release:perform
+./mvnw -B release:perform \
+    || die "release:perform failed after $tag was pushed: fix the cause and run ./mvnw release:perform again"
 
 step "Creating the GitHub Release"
 gh release create "$tag" --verify-tag --generate-notes --title "$tag" \
-    "target/checkout/target/sbom-maven-plugin-$version.jar"
+    "target/checkout/target/sbom-maven-plugin-$version.jar" \
+    || die "$tag is deployed but the GitHub Release was not created: create it by hand"
 
 step "Cleaning up"
 git switch main
