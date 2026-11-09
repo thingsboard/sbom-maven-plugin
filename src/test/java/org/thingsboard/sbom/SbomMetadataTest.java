@@ -64,7 +64,7 @@ class SbomMetadataTest {
         JsonNode second = SbomMetadata.apply(first, null, RESELLER, null);
 
         assertThat(second.path("metadata").path("manufacturer").path("name").asText()).isEqualTo("ThingsBoard, Inc.");
-        assertThat(second.path("metadata").path("supplier").path("name").asText()).isEqualTo("Reseller Ltd");
+        assertThat(second.path("metadata").path("supplier").path("name").asText()).isEqualTo("Reseller Ltd (broken on purpose)");
     }
 
     @Test
