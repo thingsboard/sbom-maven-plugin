@@ -225,6 +225,26 @@ The build fails, and the target file is left untouched, when any of these does n
 - `*IT` classes in `src/test/java`, run by Failsafe, validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers). They are skipped when Docker is not available, and with `-DskipITs`.
 - The projects in `src/it`, run by Invoker, build small projects with the plugin and `cyclonedx-maven-plugin`. They are skipped with `-Dinvoker.skip`.
 
+## Releasing
+
+Releases are deployed to `https://repo.thingsboard.io/artifactory/libs-release-public` by the release manager, whose `~/.m2/settings.xml` holds the credentials of the `thingsboard-repo-deploy` server. From an up-to-date `main`:
+
+```
+./release.sh 1.0.0 1.0.1-SNAPSHOT
+```
+
+The next development version is optional and defaults to the next patch version. The script stops at the first failure, and:
+
+1. Runs `release:prepare` on a new `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
+2. Pushes the branch, opens a PR and waits for its checks.
+3. Waits for the PR to be merged. `main` takes only merge commits, so the tagged commit stays in its history.
+4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
+5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
+
+The release builds skip the tests, since CI has run them on the PR. Before the tag is pushed nothing is published: to start over, close the PR, then delete the `release/1.0.0` branch, the local tag and `release.properties` (`./mvnw release:clean`). After `release:perform` the version is in Artifactory and cannot be deployed again.
+
+Every commit sets `project.build.outputTimestamp`, so any of them, release tags included, can be rebuilt into identical artifacts.
+
 ## License
 
 Apache License 2.0

@@ -5,8 +5,8 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<!-- Formatted as maven-release-plugin writes it, so release commits change only the version, the SCM tag and outputTimestamp -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.thingsboard</groupId>
@@ -45,6 +45,7 @@
         <url>https://github.com/thingsboard/sbom-maven-plugin</url>
         <connection>scm:git:https://github.com/thingsboard/sbom-maven-plugin.git</connection>
         <developerConnection>scm:git:git@github.com:thingsboard/sbom-maven-plugin.git</developerConnection>
+        <tag>HEAD</tag>
     </scm>
 
     <issueManagement>
@@ -60,8 +61,10 @@
         <!-- BUILD SETTINGS -->
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Fixed so every build of the same sources produces identical artifacts; revisit when a release process is defined -->
+        <!-- Fixed so every build of the same sources produces identical artifacts; release:prepare sets it to the release time -->
         <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
+        <!-- Passed by maven-release-plugin to its prepare and perform builds. CI runs the tests on the release PR, so these builds only check, package and deploy. A property, not plugin configuration, so -Darguments can override it -->
+        <arguments>-DskipTests -DskipITs -Dinvoker.skip</arguments>
 
         <!-- MAVEN API: what the plugin compiles against -->
         <!-- Minimum supported Maven: the oldest version shipped by the last two Ubuntu LTS releases (24.04: 3.8.7, 26.04: 3.9.12). The plugin compiles against it and declares it in <prerequisites>. -->
@@ -90,6 +93,7 @@
         <maven-deploy-plugin.version>3.2.0</maven-deploy-plugin.version>
         <maven-site-plugin.version>3.22.0</maven-site-plugin.version>
         <maven-wrapper-plugin.version>3.3.4</maven-wrapper-plugin.version>
+        <maven-release-plugin.version>3.3.1</maven-release-plugin.version>
         <maven-enforcer-plugin.version>3.7.0</maven-enforcer-plugin.version>
         <maven-artifact-plugin.version>3.7.0</maven-artifact-plugin.version>
         <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
@@ -302,6 +306,21 @@
                     <artifactId>maven-wrapper-plugin</artifactId>
                     <version>${maven-wrapper-plugin.version}</version>
                 </plugin>
+                <!-- Run by release.sh: see "Releasing" in README.md -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>${maven-release-plugin.version}</version>
+                    <configuration>
+                        <tagNameFormat>v@{project.version}</tagNameFormat>
+                        <scmReleaseCommitComment>chore: release @{releaseLabel}</scmReleaseCommitComment>
+                        <scmDevelopmentCommitComment>chore: start development after @{releaseLabel}</scmDevelopmentCommitComment>
+                        <!-- main takes changes only through PRs: release.sh pushes the commits as a PR branch, and the tag once the PR is merged -->
+                        <pushChanges>false</pushChanges>
+                        <!-- release:perform builds the tag from this clone instead of fetching it from GitHub -->
+                        <localCheckout>true</localCheckout>
+                    </configuration>
+                </plugin>
                 <!-- Not run here: declares the version the src/it projects use, so Dependabot updates it -->
                 <plugin>
                     <groupId>org.cyclonedx</groupId>
@@ -329,7 +348,7 @@
                                 <requireJavaVersion>
                                     <version>${maven.compiler.release}</version>
                                 </requireJavaVersion>
-                                <requirePluginVersions/>
+                                <requirePluginVersions />
                             </rules>
                         </configuration>
                     </execution>
@@ -351,7 +370,7 @@
                                         <excludedScope>provided</excludedScope>
                                     </excludedScopes>
                                 </requireUpperBoundDeps>
-                                <banDuplicatePomDependencyVersions/>
+                                <banDuplicatePomDependencyVersions />
                             </rules>
                         </configuration>
                     </execution>
