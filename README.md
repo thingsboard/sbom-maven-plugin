@@ -258,7 +258,7 @@ The next development version is optional and defaults to the next patch version.
 
 1. Runs `release:prepare` on a new `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
 2. Pushes the branch, opens a PR and waits for its checks.
-3. Waits for the PR to be merged. `main` takes only merge commits, so the tagged commit stays in its history.
+3. Merges the PR once the checks pass. `main` takes only merge commits, so the tagged commit stays in its history.
 4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
 5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
 

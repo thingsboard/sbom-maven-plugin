@@ -62,14 +62,10 @@ for _ in $(seq 30); do
 done
 gh pr checks "$pr_url" --watch --fail-fast || die "the PR checks failed on $pr_url; nothing is published: fix the cause on main and see \"Releasing\" in README.md to start over"
 
-step "Waiting for the PR to be merged: merge $pr_url (merge commit) to continue"
-while :; do
-    state=$(gh pr view "$pr_url" --json state --jq .state) \
-        || die "could not read the state of $pr_url: once it is merged, finish the release by hand: see \"Releasing\" in README.md"
-    [ "$state" = MERGED ] && break
-    [ "$state" = CLOSED ] && die "the PR was closed without merging; nothing is published: see \"Releasing\" in README.md to start over"
-    sleep 10
-done
+step "Merging the PR"
+# main takes only merge commits, which keep the tagged commit in its history
+gh pr merge "$pr_url" --merge \
+    || die "merging $pr_url failed; nothing is published: merge it by hand (merge commit) and finish the release by hand, or start over: see \"Releasing\" in README.md"
 
 # From here on, "Finish the release by hand" in README.md repeats these steps: keep the two in sync
 step "Pushing $tag"
