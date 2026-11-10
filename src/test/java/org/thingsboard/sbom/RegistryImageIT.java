@@ -31,7 +31,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * Runs what the {@code image} goal does with the real {@code docker buildx}, {@code syft} and {@code oras} against a
  * registry in Docker: the projects in {@code src/it} run the goal with stand-ins for the tools. Skipped without Docker,
- * and when {@code syft} or {@code oras} is missing, except in CI, where they must be installed.
+ * and when {@code syft} or {@code oras} is missing or Docker cannot push a two-architecture image, except in CI,
+ * where all of it must work.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class RegistryImageIT {
@@ -59,7 +60,8 @@ class RegistryImageIT {
      */
     @BeforeAll
     static void pushTheImage() throws IOException {
-        assumeTrue(System.getenv("CI") != null || (installed("syft") && installed("oras")), "syft and oras are not installed");
+        boolean ci = System.getenv("CI") != null;
+        assumeTrue(ci || (installed("syft") && installed("oras")), "syft and oras are not installed");
         ImageReference image = ImageReference.parse("localhost:" + REGISTRY.getMappedPort(5000) + "/" + REPOSITORY);
         tools = new ImageTools("docker", "syft", "oras", image, true);
 
@@ -107,8 +109,14 @@ class RegistryImageIT {
             entries.closeEntry();
         }
         for (String tag : TAGS) {
-            run("docker", "buildx", "build", "--tag", image + ":" + tag, "--platform", "linux/amd64,linux/arm64",
-                    "--output", "type=registry", context.toString());
+            try {
+                run("docker", "buildx", "build", "--tag", image + ":" + tag, "--platform", "linux/amd64,linux/arm64",
+                        "--output", "type=registry", context.toString());
+            } catch (SbomException e) {
+                // The default builder of a Docker without the containerd image store builds one architecture only
+                assumeTrue(ci, "Docker cannot push a two-architecture image: " + e.getMessage());
+                throw e;
+            }
         }
 
         components = List.of(SbomImageTest.debComponent(tempDir),
@@ -122,8 +130,14 @@ class RegistryImageIT {
         List<ImageTools.Platform> platforms = tools.platforms(TAGS);
         assertThat(platforms).extracting(ImageTools.Platform::architecture).containsExactly("amd64", "arm64");
 
-        List<Path> sboms = new ImagePublisher(tools, message -> { })
-                .publish(TAGS, "4.4.1", INSTALL_DIR + "/**", components, tempDir.resolve("sbom"), true);
+        ImagePublisher publisher = new ImagePublisher(tools, message -> { });
+        List<Path> sboms = publisher.publish(TAGS, "4.4.1", INSTALL_DIR + "/**", components, tempDir.resolve("sbom"), true);
+        List<String> attached = new ArrayList<>();
+        for (Path sbom : sboms) {
+            attached.add(Files.readString(sbom));
+        }
+        // A second run writes the SBOMs again and leaves the ones that are attached
+        assertThat(publisher.publish(TAGS, "4.4.1", INSTALL_DIR + "/**", components, tempDir.resolve("sbom"), true)).isEqualTo(sboms);
 
         assertThat(sboms).hasSize(2);
         for (int i = 0; i < 2; i++) {
@@ -134,7 +148,8 @@ class RegistryImageIT {
 
             JsonNode described = SbomFiles.readFile(sboms.get(i));
             assertThat(described.path("metadata").path("component").path("purl").asText())
-                    .isEqualTo("pkg:docker/" + REPOSITORY + "@" + digest.replace(":", "%3A") + "?arch=" + architecture);
+                    .isEqualTo("pkg:docker/" + REPOSITORY + "@" + digest.replace(":", "%3A") + "?arch=" + architecture
+                            + "&repository_url=" + tools.image().registry().replace(":", "%3A"));
             assertThat(described.path("metadata").path("tools").path("components").findValuesAsText("name")).contains("syft");
             assertThat(described.path("components").findValuesAsText("bom-ref"))
                     .contains(SbomImageTest.DEB_PURL, SbomPackageTest.APP_REF, RUNTIME + architecture)
@@ -144,7 +159,7 @@ class RegistryImageIT {
                     .contains(SbomPackageTest.APP_REF)
                     .anyMatch(ref -> ref.startsWith("pkg:deb/debian/libexample@1.2.3-1"));
 
-            assertThat(attached(digest)).containsExactly(Files.readString(sboms.get(i)));
+            assertThat(attached(digest)).containsExactly(attached.get(i));
         }
     }
 

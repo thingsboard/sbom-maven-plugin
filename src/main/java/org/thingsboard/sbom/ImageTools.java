@@ -105,15 +105,34 @@ final class ImageTools {
     }
 
     /**
+     * Whether a CycloneDX SBOM is attached to the image already.
+     */
+    boolean hasSbom(String digest) {
+        List<String> command = orasCommand("discover");
+        command.addAll(List.of("--format", "json", "--artifact-type", SBOM_MEDIA_TYPE, image.qualified() + "@" + digest));
+        String referrers = run("oras", null, Map.of(), command);
+        try {
+            return SbomFiles.MAPPER.readTree(referrers).findValuesAsText("artifactType").contains(SBOM_MEDIA_TYPE);
+        } catch (IOException e) {
+            throw new SbomException("oras did not list what is attached to " + image + "@" + digest + " as JSON: " + referrers.strip(), e);
+        }
+    }
+
+    /**
      * Attaches the SBOM to the image as an OCI referrer artifact, titled with the file name.
      */
     void attach(String digest, Path sbom) {
-        List<String> command = new ArrayList<>(List.of(oras, "attach"));
+        List<String> command = orasCommand("attach");
+        command.addAll(List.of("--artifact-type", SBOM_MEDIA_TYPE, image.qualified() + "@" + digest, sbom.getFileName() + ":" + SBOM_MEDIA_TYPE));
+        run("oras", sbom.toAbsolutePath().getParent(), Map.of(), command);
+    }
+
+    private List<String> orasCommand(String subcommand) {
+        List<String> command = new ArrayList<>(List.of(oras, subcommand));
         if (plainHttp) {
             command.add("--plain-http");
         }
-        command.addAll(List.of("--artifact-type", SBOM_MEDIA_TYPE, image.qualified() + "@" + digest, sbom.getFileName() + ":" + SBOM_MEDIA_TYPE));
-        run("oras", sbom.toAbsolutePath().getParent(), Map.of(), command);
+        return command;
     }
 
     /**

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import groovy.json.JsonSlurper
 
-def imageRef = 'pkg:docker/example/app@sha256%3Aa99a84223d27deef5f4c21a5ce0ef4c4772727ee3d0348c0e0fa3c385dc2ecb0?arch=arm64'
+def imageRef = 'pkg:docker/example/app@sha256%3Aa99a84223d27deef5f4c21a5ce0ef4c4772727ee3d0348c0e0fa3c385dc2ecb0?arch=arm64&repository_url=registry.example.com%3A5000'
 def appRef = 'pkg:maven/org.example.it/app@1.0'
 def uiRef = 'pkg:maven/org.example.it/ui@1.0'
 def chromeRef = 'pkg:generic/google/chrome-for-testing@156.0.8078.4?os=linux&arch=arm64'

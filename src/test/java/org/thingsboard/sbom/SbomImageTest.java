@@ -464,7 +464,7 @@ class SbomImageTest {
     }
 
     @Test
-    void failsOnABlankTag() {
+    void failsOnABlankVersion() {
         SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", " ", DIGEST, "amd64");
 
         assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
@@ -473,12 +473,27 @@ class SbomImageTest {
     }
 
     @Test
-    void failsOnABlankArchitecture() {
-        SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, "");
+    void failsOnAnArchitectureThatIsNotLowercaseLettersAndDigits() {
+        for (String architecture : new String[] {null, "", " ", "AMD64", "arm/v7", "../amd64"}) {
+            SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, architecture);
 
-        assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
-                .isInstanceOf(SbomException.class)
-                .hasMessageContaining("Image architecture is blank");
+            assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
+                    .isInstanceOf(SbomException.class)
+                    .hasMessageContaining("must be lowercase letters and digits");
+        }
+    }
+
+    @Test
+    void theRegistryOfAnImageThatIsNotOnDockerHubIsInItsPurl() {
+        SbomImage.Image image = new SbomImage.Image("registry.example.com:5000", "thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, "amd64");
+
+        ObjectNode described = SbomImage.describe(osSbom(), image, List.of(debComponent()));
+
+        String purl = "pkg:docker/thingsboard/tb-mqtt-transport@" + DIGEST.replace(":", "%3A") + "?arch=amd64&repository_url=registry.example.com%3A5000";
+        assertThat(described.path("metadata").path("component").path("purl").asText()).isEqualTo(purl);
+        assertThat(described.path("metadata").path("component").path("bom-ref").asText()).isEqualTo(purl);
+        assertThat(described.path("serialNumber").asText())
+                .isNotEqualTo(SbomImage.describe(osSbom(), image(), List.of(debComponent())).path("serialNumber").asText());
     }
 
     int packageComponentCount() {

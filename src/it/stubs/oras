@@ -4,8 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# Stands in for oras in the integration tests: checks that the file to attach is in the working directory
-# and records the call in oras.log there.
+# Stands in for oras in the integration tests. "oras discover" finds nothing attached. "oras attach" checks that
+# the file to attach is in the working directory and records the call in oras.log there.
+if [ "$1" = discover ]; then
+    echo '{"referrers": []}'
+    exit
+fi
 for arg; do file=${arg%%:*}; done
 [ -f "$file" ] || { echo "no file $file in $PWD" >&2; exit 1; }
 echo "$*" >> oras.log

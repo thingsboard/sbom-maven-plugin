@@ -169,15 +169,15 @@ The `image` goal has no default phase: bind it after the build pushes the image,
 1. finds the digest of that architecture's image with `docker buildx imagetools inspect --raw`, for each of the `tags`. Tags that point to the same image share one SBOM;
 2. scans the image with `syft scan registry:<repository>@<digest>`, leaving out `scanExclude`;
 3. writes the image SBOM to `<outputDirectory>/<namespace>_<name>_<version>_<architecture>_<first 12 digits of the digest>.cdx.json`;
-4. attaches the SBOM to that architecture's image as an OCI referrer artifact of type `application/vnd.cyclonedx+json` with `oras attach`.
+4. attaches the SBOM to that architecture's image as an OCI referrer artifact of type `application/vnd.cyclonedx+json` with `oras attach`, unless `oras discover` finds one there.
 
-Nothing is attached unless the SBOM of every architecture is written. Running the goal again attaches the SBOMs again.
+Nothing is attached unless the SBOM of every architecture is written. An image that has a CycloneDX SBOM attached already keeps it and gets no second one, so when attaching fails part-way, the images attached so far keep their SBOMs and running the build again attaches the rest.
 
 It needs `docker` with buildx, [`syft`](https://github.com/anchore/syft) and [`oras`](https://oras.land) on the `PATH`, logged in to the registry as for `docker push`. The image must be a multi-architecture one, pushed with `docker buildx build --platform`.
 
 To see what is attached to an image: `oras discover thingsboard/tb-node@sha256:40c3...`.
 
-The result describes the image as a `container` root component (`pkg:docker/<repository>@<digest>?arch=<architecture>`, version = `version`, SHA-256 = digest) that depends on everything in it:
+The result describes the image as a `container` root component (`pkg:docker/<namespace>/<name>@<digest>?arch=<architecture>`, with `&repository_url=<registry>` when the image is not on Docker Hub; version = `version`, SHA-256 = digest) that depends on everything in it:
 
 - Everything the scan found is kept unchanged, except what the bundled components replace. The scan's own root is dropped; the image depends on the scanned components nothing else depends on, and on one component of each dependency cycle nothing outside the cycle depends on.
 - Each bundled component is added with its SBOM, as in the `package` goal, and the image depends on it. Its tools are added to `metadata.tools`; `lifecycles`, `manufacturer`, `supplier` and the root's manufacturer come from the first bundled SBOM.
@@ -208,7 +208,7 @@ A bundled component without an `sbom`, such as a browser an install script downl
 | `docker`, `syft`, `oras` | `sbom.image.docker`, `sbom.image.syft`, `sbom.image.oras` | `docker`, `syft`, `oras` | The executables to run |
 | `skip` | `sbom.image.skip` | `false` | Skip the image SBOMs |
 
-The build fails, and nothing is attached, when the repository is not `<namespace>/<name>` after the optional registry, no tag is configured, `docker`, `syft` or `oras` is missing or fails (the message of the tool is reported), a tag is not a multi-architecture image with Linux images, the version is blank, no components are configured, a component has no name, is declared twice, has an `sbom` together with details of its own, sets `packages`, or has a supplier without name or with a blank url, a component with an `sbom` sets none or more than one of `file`, `installDir` and `bundleDir`, a component without an `sbom` sets a directory, a directory is not absolute or ends with `/`, a value still contains an unresolved `${...}` property, the scan does not list a `file` package exactly once or lists it with another version, the scan lists a component of a `file` component's SBOM, the image has a component without a purl under a directory, or a package that the SBOM does not list or lists with another version, a required package is not installed at its path or has no path, components clash, the result fails schema validation, or a component is not reachable from the image.
+The build fails, and nothing is attached, when the repository is not `<namespace>/<name>` after the optional registry, no tag is configured, `docker`, `syft` or `oras` is missing or fails (the message of the tool is reported), a tag is not a multi-architecture image with Linux images, an architecture is not lowercase letters and digits, the version is blank, no components are configured, a component has no name, is declared twice, has an `sbom` together with details of its own, sets `packages`, or has a supplier without name or with a blank url, a component with an `sbom` sets none or more than one of `file`, `installDir` and `bundleDir`, a component without an `sbom` sets a directory, a directory is not absolute or ends with `/`, a value still contains an unresolved `${...}` property, the scan does not list a `file` package exactly once or lists it with another version, the scan lists a component of a `file` component's SBOM, the image has a component without a purl under a directory, or a package that the SBOM does not list or lists with another version, a required package is not installed at its path or has no path, components clash, the result fails schema validation, or a component is not reachable from the image.
 
 ## Skipping
 
@@ -240,7 +240,7 @@ The build fails, and the target file is left untouched, when any of these does n
 
 `./mvnw test` runs the unit tests, which need no Docker. `verify` also runs two kinds of integration tests:
 
-- `*IT` classes in `src/test/java`, run by Failsafe, validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers). They are skipped when Docker is not available, and with `-DskipITs`. `RegistryImageIT` runs what the `image` goal does with the real `docker buildx`, `syft` and `oras` against a registry in Docker: it is also skipped when `syft` or `oras` is not installed, except in CI, which installs the versions pinned in `.github/workflows/build.yml`.
+- `*IT` classes in `src/test/java`, run by Failsafe, validate merged, package and image SBOMs with the official `cyclonedx-cli` in Docker (Testcontainers). They are skipped when Docker is not available, and with `-DskipITs`. `RegistryImageIT` runs what the `image` goal does with the real `docker buildx`, `syft` and `oras` against a registry in Docker: it is also skipped when `syft` or `oras` is not installed or Docker cannot push a two-architecture image, except in CI, which installs the versions pinned in `.github/workflows/build.yml`.
 - The projects in `src/it`, run by Invoker, build small projects with the plugin and `cyclonedx-maven-plugin`. The `image` goal runs there with the stand-ins for `docker`, `syft` and `oras` in `src/it/stubs`. They are skipped with `-Dinvoker.skip`.
 
 ## Releasing

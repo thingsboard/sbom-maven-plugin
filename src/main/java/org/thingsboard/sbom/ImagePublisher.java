@@ -27,7 +27,8 @@ final class ImagePublisher {
 
     /**
      * Scans every architecture the tags point to and writes its SBOM to the directory, then attaches each SBOM to its
-     * image when {@code attach} is set: nothing is attached unless all are written. Blank tags are ignored.
+     * image when {@code attach} is set: nothing is attached unless all are written, and an image that has an SBOM
+     * attached already keeps it. Blank tags are ignored.
      * Returns the SBOMs in the order of the architectures.
      */
     List<Path> publish(List<String> tags, String version, String scanExclude, List<BundledComponent> components, Path directory, boolean attach) {
@@ -43,7 +44,7 @@ final class ImagePublisher {
         ImageReference image = tools.image();
         Map<ImageTools.Platform, Path> sboms = new LinkedHashMap<>();
         for (ImageTools.Platform platform : tools.platforms(pushedTags)) {
-            SbomImage.Image described = new SbomImage.Image(image.name(), version, platform.digest(), platform.architecture());
+            SbomImage.Image described = new SbomImage.Image(image.registry(), image.name(), version, platform.digest(), platform.architecture());
             // Before the scan, which takes the time; the file names also need a digest that is known to be one
             SbomImage.checkImage(described);
             String id = platform.architecture() + "_" + platform.digest().substring("sha256:".length(), "sha256:".length() + 12);
@@ -60,6 +61,11 @@ final class ImagePublisher {
             return List.copyOf(sboms.values());
         }
         sboms.forEach((platform, sbom) -> {
+            // A build that is run again, say after an attach failed part-way, must not give an image a second SBOM
+            if (tools.hasSbom(platform.digest())) {
+                log.accept(image + "@" + platform.digest() + " has an SBOM attached already: not attaching " + sbom.getFileName());
+                return;
+            }
             tools.attach(platform.digest(), sbom);
             log.accept("Attached " + sbom.getFileName() + " to " + image + "@" + platform.digest());
         });
