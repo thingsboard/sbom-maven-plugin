@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -18,7 +16,7 @@ import java.util.List;
  * The file is left untouched when any check fails. Runs at {@code process-resources} by default.
  */
 @Mojo(name = "metadata", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, threadSafe = true)
-public class MetadataMojo extends AbstractMojo {
+public class MetadataMojo extends SbomMojo {
 
     /**
      * SBOM to update, rewritten in place.
@@ -51,17 +49,19 @@ public class MetadataMojo extends AbstractMojo {
     private boolean skip;
 
     @Override
-    public void execute() throws MojoFailureException {
-        if (skip) {
-            getLog().info("Skipping SBOM metadata");
-            return;
-        }
-        try {
-            List<String> fields = SbomMetadata.applyToFile(targetFile.toPath(), manufacturer, supplier, componentManufacturer);
-            getLog().info("Set " + String.join(", ", fields) + " in " + targetFile);
-        } catch (SbomException e) {
-            throw new MojoFailureException(e.getMessage(), e);
-        }
+    boolean isSkipped() {
+        return skip;
+    }
+
+    @Override
+    String description() {
+        return "SBOM metadata";
+    }
+
+    @Override
+    void run() {
+        List<String> fields = SbomMetadata.applyToFile(targetFile.toPath(), manufacturer, supplier, componentManufacturer);
+        getLog().info("Set " + String.join(", ", fields) + " in " + targetFile);
     }
 
 }

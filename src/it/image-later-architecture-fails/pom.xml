@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.example.it</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0</version>
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>@cyclonedx-maven-plugin.version@</version>
+                <executions>
+                    <execution>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>makeBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <projectType>application</projectType>
+                    <outputDirectory>${project.build.outputDirectory}/META-INF/sbom</outputDirectory>
+                    <outputFormat>json</outputFormat>
+                    <outputName>application.cdx</outputName>
+                    <skipNotDeployed>false</skipNotDeployed>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>@project.groupId@</groupId>
+                <artifactId>@project.artifactId@</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>package-sbom</id>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
+                        <configuration>
+                            <name>app</name>
+                            <version>1.0.0</version>
+                            <packages>
+                                <package>
+                                    <id>deb</id>
+                                    <file>${project.basedir}/dist/app.deb</file>
+                                    <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
+                                </package>
+                            </packages>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>image-sbom</id>
+                        <goals>
+                            <goal>image</goal>
+                        </goals>
+                        <configuration>
+                            <repository>example/app</repository>
+                            <tags>
+                                <tag>latest</tag>
+                                <tag>${project.version}</tag>
+                            </tags>
+                            <scanExclude>/usr/share/app/**</scanExclude>
+                            <components>
+                                <component>
+                                    <sbom>${project.basedir}/dist/app.deb.cdx.json</sbom>
+                                    <file>${project.basedir}/dist/app.deb</file>
+                                </component>
+                            </components>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

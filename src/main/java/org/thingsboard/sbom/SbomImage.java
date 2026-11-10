@@ -30,6 +30,7 @@ import static org.thingsboard.sbom.SbomChecks.check;
 public final class SbomImage {
 
     private static final Pattern DIGEST = Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final Pattern ARCHITECTURE = Pattern.compile("[a-z0-9]+");
     private static final Pattern REPOSITORY = Pattern.compile("[a-z0-9]+(?:[._-][a-z0-9]+)*/[a-z0-9]+(?:[._-][a-z0-9]+)*");
     private static final Set<String> OS_PACKAGE_TYPES = Set.of("deb", "rpm", "apk");
     private static final String LOCATION = "syft:location:0:path";
@@ -38,10 +39,18 @@ public final class SbomImage {
 
     private SbomImage() {}
 
-    public record Image(String repository, String tag, String digest, String architecture) {
+    /**
+     * One architecture of an image. {@code registry} is null for Docker Hub.
+     */
+    public record Image(String registry, String repository, String version, String digest, String architecture) {
+
+        public Image(String repository, String version, String digest, String architecture) {
+            this(null, repository, version, digest, architecture);
+        }
 
         String purl() {
-            return "pkg:docker/" + repository + "@" + digest.replace(":", "%3A") + "?arch=" + architecture;
+            return "pkg:docker/" + repository + "@" + digest.replace(":", "%3A") + "?arch=" + architecture
+                    + (registry == null ? "" : "&repository_url=" + registry.replace(":", "%3A"));
         }
 
     }
@@ -57,6 +66,7 @@ public final class SbomImage {
         SbomChecks.checkInput("OS", os);
         String specVersion = os.path("specVersion").asText();
         List<Bundled> included = components.stream()
+                .map(component -> component.forArchitecture(image.architecture()))
                 .map(component -> new Bundled(component, BundledComponents.resolve(component, specVersion)))
                 .toList();
 
@@ -352,14 +362,19 @@ public final class SbomImage {
 
     }
 
-    private static void checkImage(Image image) {
+    static void checkRepository(String repository) {
+        check(repository != null && REPOSITORY.matcher(repository).matches(),
+                "Image repository " + repository + " must be <namespace>/<name>, for example thingsboard/tb-node");
+    }
+
+    static void checkImage(Image image) {
         check(image != null, "No image configured");
-        check(image.repository() != null && REPOSITORY.matcher(image.repository()).matches(),
-                "Image repository " + image.repository() + " must be <namespace>/<name>, for example thingsboard/tb-node");
-        check(image.tag() != null && !image.tag().isBlank(), "Image tag is blank");
+        checkRepository(image.repository());
+        check(image.version() != null && !image.version().isBlank(), "Image version is blank");
         check(image.digest() != null && DIGEST.matcher(image.digest()).matches(),
                 "Image digest " + image.digest() + " must be sha256:<64 hex digits> of one architecture's image manifest");
-        check(image.architecture() != null && !image.architecture().isBlank(), "Image architecture is blank");
+        check(image.architecture() != null && ARCHITECTURE.matcher(image.architecture()).matches(),
+                "Image architecture " + image.architecture() + " must be lowercase letters and digits, for example amd64");
     }
 
     private static ObjectNode metadata(JsonNode os, List<Bundled> included, Image image, String rootRef) {
@@ -379,7 +394,7 @@ public final class SbomImage {
         SbomJson.copyFields(bundledMetadata.path("component"), root, "manufacturer");
         root.put("group", image.repository().substring(0, slash));
         root.put("name", image.repository().substring(slash + 1));
-        root.put("version", image.tag());
+        root.put("version", image.version());
         root.set("hashes", SbomJson.hashesJson(Map.of("SHA-256", image.digest().substring("sha256:".length()))));
         root.put("purl", rootRef);
         SbomJson.copyFields(bundledMetadata, metadata, "manufacturer", "supplier");

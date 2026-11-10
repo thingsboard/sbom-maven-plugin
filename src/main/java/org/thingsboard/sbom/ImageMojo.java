@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
@@ -12,77 +10,105 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Writes the SBOM of one architecture of a pushed Docker image: what a scanner such as Syft found in the image,
- * with the parts we built replaced by our own SBOMs. The image is the {@code container} root component.
- * No image SBOM is written when any check fails. Has no default phase: run it once per architecture after the image
- * is pushed, because it needs that architecture's digest and a scan of the image.
+ * Writes the SBOM of every architecture of a pushed Docker image and attaches it to the image as an OCI referrer artifact.
+ * Each SBOM is what Syft finds in the image, with the parts we built replaced by our own SBOMs; the image is the
+ * {@code container} root component. Nothing is attached when any check fails. Has no default phase: bind it after the
+ * build pushes the image, because it reads the image from the registry. Needs {@code docker} with buildx, {@code syft}
+ * and {@code oras}.
  */
 @Mojo(name = "image", threadSafe = true)
-public class ImageMojo extends AbstractMojo {
+public class ImageMojo extends SbomMojo {
 
     /**
-     * CycloneDX SBOM of the image from a scanner, with the location of each component in {@code syft:location:0:path}.
-     */
-    @Parameter(property = "sbom.image.osSbom", required = true)
-    private File osSbom;
-
-    /**
-     * {@code <namespace>/<name>} of the image, without registry or tag.
+     * {@code <namespace>/<name>} of the image, without tag. Docker Hub is the registry unless one comes first,
+     * as in {@code registry.example.com/<namespace>/<name>}.
      */
     @Parameter(property = "sbom.image.repository", required = true)
     private String repository;
 
     /**
+     * Every tag the build pushed: the SBOMs cover the images of all of them. Blank tags are ignored.
+     */
+    @Parameter(property = "sbom.image.tags", defaultValue = "${project.version}", required = true)
+    private List<String> tags = new ArrayList<>();
+
+    /**
      * Version of the image component.
      */
-    @Parameter(property = "sbom.image.tag", defaultValue = "${project.version}", required = true)
-    private String tag;
+    @Parameter(property = "sbom.image.version", defaultValue = "${project.version}", required = true)
+    private String version;
 
     /**
-     * {@code sha256:} digest of this architecture's image manifest, not of the multi-architecture index.
+     * Talk to the registry over plain HTTP, for a local test registry.
      */
-    @Parameter(property = "sbom.image.digest", required = true)
-    private String digest;
+    @Parameter(property = "sbom.image.plainHttp", defaultValue = "false")
+    private boolean plainHttp;
 
     /**
-     * Architecture of the image, e.g. {@code amd64}.
+     * Glob of the image paths Syft must not scan, e.g. the install directory of a package whose SBOM is a bundled component.
      */
-    @Parameter(property = "sbom.image.architecture", required = true)
-    private String architecture;
+    @Parameter(property = "sbom.image.scanExclude")
+    private String scanExclude;
 
     /**
-     * Where to write the image SBOM.
+     * Where to write the scans and the image SBOMs.
      */
-    @Parameter(property = "sbom.image.outputFile", required = true)
-    private File outputFile;
+    @Parameter(property = "sbom.image.outputDirectory", defaultValue = "${project.build.directory}/sbom", required = true)
+    private File outputDirectory;
 
     /**
      * Bundled components, as in the {@code package} goal without {@code packages}, plus
      * {@code installDir} and {@code bundleDir} (absolute paths in the image). A component with an {@code sbom} sets
      * exactly one of {@code file}, {@code installDir} and {@code bundleDir}, which says how its SBOM is checked against the image.
+     * {@code @{architecture}} in a version, purl or cpe stands for the architecture of the image.
      */
     @Parameter(required = true)
     private List<BundledComponent> components = new ArrayList<>();
 
     /**
-     * Skip the image SBOM.
+     * Attach the SBOMs to the image. Set to {@code false} to only write them.
+     */
+    @Parameter(property = "sbom.image.attach", defaultValue = "true")
+    private boolean attach;
+
+    /**
+     * The {@code docker} executable.
+     */
+    @Parameter(property = "sbom.image.docker", defaultValue = "docker", required = true)
+    private String docker;
+
+    /**
+     * The {@code syft} executable.
+     */
+    @Parameter(property = "sbom.image.syft", defaultValue = "syft", required = true)
+    private String syft;
+
+    /**
+     * The {@code oras} executable.
+     */
+    @Parameter(property = "sbom.image.oras", defaultValue = "oras", required = true)
+    private String oras;
+
+    /**
+     * Skip the image SBOMs.
      */
     @Parameter(property = "sbom.image.skip", defaultValue = "false")
     private boolean skip;
 
     @Override
-    public void execute() throws MojoFailureException {
-        if (skip) {
-            getLog().info("Skipping image SBOM");
-            return;
-        }
-        SbomImage.Image image = new SbomImage.Image(repository, tag, digest, architecture);
-        try {
-            SbomImage.write(osSbom.toPath(), image, components, outputFile.toPath());
-        } catch (SbomException e) {
-            throw new MojoFailureException(e.getMessage(), e);
-        }
-        getLog().info("Wrote image SBOM " + outputFile + " for " + repository + "@" + digest + " (" + architecture + ")");
+    boolean isSkipped() {
+        return skip;
+    }
+
+    @Override
+    String description() {
+        return "image SBOMs";
+    }
+
+    @Override
+    void run() {
+        ImageTools tools = new ImageTools(docker, syft, oras, ImageReference.parse(repository), plainHttp);
+        new ImagePublisher(tools, getLog()::info).publish(tags, version, scanExclude, components, outputDirectory.toPath(), attach);
     }
 
 }

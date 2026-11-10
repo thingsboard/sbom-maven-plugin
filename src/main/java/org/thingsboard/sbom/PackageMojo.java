@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -20,7 +18,7 @@ import java.util.List;
  * plugins that build the packages, so it runs after them in the same phase.
  */
 @Mojo(name = "package", defaultPhase = LifecyclePhase.PACKAGE, threadSafe = true)
-public class PackageMojo extends AbstractMojo {
+public class PackageMojo extends SbomMojo {
 
     /**
      * Application SBOM to start from.
@@ -62,20 +60,22 @@ public class PackageMojo extends AbstractMojo {
     private boolean skip;
 
     @Override
-    public void execute() throws MojoFailureException {
-        if (skip) {
-            getLog().info("Skipping package SBOMs");
-            return;
-        }
+    boolean isSkipped() {
+        return skip;
+    }
+
+    @Override
+    String description() {
+        return "package SBOMs";
+    }
+
+    @Override
+    void run() {
         List<BundledComponent> bundled = components == null ? List.of() : components;
-        try {
-            SbomPackage.checkConfig(packages, bundled);
-            packages.stream().filter(PackageFile::isSkip).forEach(packageFile -> getLog().info("Skipping package SBOM for " + packageFile.getId()));
-            for (Path output : SbomPackage.writeAll(sourceFile.toPath(), name, version, packages, bundled)) {
-                getLog().info("Wrote package SBOM " + output);
-            }
-        } catch (SbomException e) {
-            throw new MojoFailureException(e.getMessage(), e);
+        SbomPackage.checkConfig(packages, bundled);
+        packages.stream().filter(PackageFile::isSkip).forEach(packageFile -> getLog().info("Skipping package SBOM for " + packageFile.getId()));
+        for (Path output : SbomPackage.writeAll(sourceFile.toPath(), name, version, packages, bundled)) {
+            getLog().info("Wrote package SBOM " + output);
         }
     }
 

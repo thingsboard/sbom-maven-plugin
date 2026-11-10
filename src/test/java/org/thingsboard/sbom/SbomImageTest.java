@@ -43,9 +43,19 @@ class SbomImageTest {
 
     @BeforeEach
     void createPackage() throws IOException {
-        deb = Files.writeString(tempDir.resolve("tb-mqtt-transport.deb"), "deb contents");
-        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
-        packageSbom = SbomPackage.writeAll(applicationSbom, "tb-mqtt-transport", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of()).get(0);
+        BundledComponent component = debComponent(tempDir);
+        deb = component.getFile().toPath();
+        packageSbom = component.getSbom().toPath();
+    }
+
+    /**
+     * The tb-mqtt-transport package and its SBOM, written to the directory, as the component an image installs.
+     */
+    static BundledComponent debComponent(Path directory) throws IOException {
+        Path deb = Files.writeString(directory.resolve("tb-mqtt-transport.deb"), "deb contents");
+        Path applicationSbom = Files.writeString(directory.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
+        Path packageSbom = SbomPackage.writeAll(applicationSbom, "tb-mqtt-transport", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of()).get(0);
+        return new BundledComponent("library", null, null, deb.toFile()).sbom(packageSbom.toFile());
     }
 
     static ObjectNode osSbom() {
@@ -454,21 +464,36 @@ class SbomImageTest {
     }
 
     @Test
-    void failsOnABlankTag() {
+    void failsOnABlankVersion() {
         SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", " ", DIGEST, "amd64");
 
         assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
                 .isInstanceOf(SbomException.class)
-                .hasMessageContaining("Image tag is blank");
+                .hasMessageContaining("Image version is blank");
     }
 
     @Test
-    void failsOnABlankArchitecture() {
-        SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, "");
+    void failsOnAnArchitectureThatIsNotLowercaseLettersAndDigits() {
+        for (String architecture : new String[] {null, "", " ", "AMD64", "arm/v7", "../amd64"}) {
+            SbomImage.Image image = new SbomImage.Image("thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, architecture);
 
-        assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
-                .isInstanceOf(SbomException.class)
-                .hasMessageContaining("Image architecture is blank");
+            assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
+                    .isInstanceOf(SbomException.class)
+                    .hasMessageContaining("must be lowercase letters and digits");
+        }
+    }
+
+    @Test
+    void theRegistryOfAnImageThatIsNotOnDockerHubIsInItsPurl() {
+        SbomImage.Image image = new SbomImage.Image("registry.example.com:5000", "thingsboard/tb-mqtt-transport", "4.4.1", DIGEST, "amd64");
+
+        ObjectNode described = SbomImage.describe(osSbom(), image, List.of(debComponent()));
+
+        String purl = "pkg:docker/thingsboard/tb-mqtt-transport@" + DIGEST.replace(":", "%3A") + "?arch=amd64&repository_url=registry.example.com%3A5000";
+        assertThat(described.path("metadata").path("component").path("purl").asText()).isEqualTo(purl);
+        assertThat(described.path("metadata").path("component").path("bom-ref").asText()).isEqualTo(purl);
+        assertThat(described.path("serialNumber").asText())
+                .isNotEqualTo(SbomImage.describe(osSbom(), image(), List.of(debComponent())).path("serialNumber").asText());
     }
 
     int packageComponentCount() {

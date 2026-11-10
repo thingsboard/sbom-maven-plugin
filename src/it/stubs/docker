@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Stands in for docker in the integration tests:
+# "docker buildx imagetools inspect <image>:<tag> ..." prints data/manifest-<tag>.json of the test project.
+[ "$1 $2 $3" = "buildx imagetools inspect" ] || { echo "unexpected: docker $*" >&2; exit 2; }
+cat "data/manifest-${4##*:}.json"

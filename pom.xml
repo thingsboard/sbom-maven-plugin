@@ -544,6 +544,12 @@
                     <filterProperties>
                         <cyclonedx-maven-plugin.version>${cyclonedx-maven-plugin.version}</cyclonedx-maven-plugin.version>
                     </filterProperties>
+                    <!-- The image goal runs these stand-ins instead of the tools that need a registry -->
+                    <properties>
+                        <sbom.image.docker>${project.basedir}/src/it/stubs/docker</sbom.image.docker>
+                        <sbom.image.syft>${project.basedir}/src/it/stubs/syft</sbom.image.syft>
+                        <sbom.image.oras>${project.basedir}/src/it/stubs/oras</sbom.image.oras>
+                    </properties>
                 </configuration>
                 <executions>
                     <execution>

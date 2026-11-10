@@ -1,0 +1,53 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "anchore",
+          "name": "syft",
+          "version": "1.57.0"
+        }
+      ]
+    },
+    "component": {
+      "bom-ref": "ba5a4903c5069929",
+      "type": "container",
+      "name": "example/app",
+      "version": "sha256:40c308b73fdf1f4fd3375881e6812825b42906b13cfef47e00c7dbe774391778"
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "os:debian@13.7",
+      "type": "operating-system",
+      "name": "debian",
+      "version": "13.7"
+    },
+    {
+      "bom-ref": "pkg:deb/debian/libc6@2.41-12?arch=amd64&distro=debian-13.7&package-id=2dc9b457970cbedd",
+      "type": "library",
+      "name": "libc6",
+      "version": "2.41-12",
+      "purl": "pkg:deb/debian/libc6@2.41-12?arch=amd64&distro=debian-13.7"
+    },
+    {
+      "bom-ref": "pkg:deb/debian/app@1.0.0-1?arch=all&distro=debian-13.7&package-id=c84ed22d92ad12f4",
+      "type": "library",
+      "name": "app",
+      "version": "1.0.0-1",
+      "purl": "pkg:deb/debian/app@1.0.0-1?arch=all&distro=debian-13.7"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:deb/debian/app@1.0.0-1?arch=all&distro=debian-13.7&package-id=c84ed22d92ad12f4",
+      "dependsOn": [
+        "pkg:deb/debian/libc6@2.41-12?arch=amd64&distro=debian-13.7&package-id=2dc9b457970cbedd"
+      ]
+    }
+  ]
+}

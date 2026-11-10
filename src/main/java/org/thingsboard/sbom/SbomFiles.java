@@ -22,7 +22,7 @@ import java.util.zip.ZipFile;
 final class SbomFiles {
 
     private static final List<String> HASH_ALGORITHMS = List.of("SHA-256", "SHA-512");
-    private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private SbomFiles() {}
 

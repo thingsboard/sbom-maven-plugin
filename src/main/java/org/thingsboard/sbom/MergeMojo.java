@@ -3,7 +3,6 @@
 package org.thingsboard.sbom;
 
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -20,7 +19,7 @@ import java.io.File;
  * Runs at {@code process-resources} by default, after {@code cyclonedx-maven-plugin:makeBom} bound to {@code generate-resources}.
  */
 @Mojo(name = "merge", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, requiresDependencyResolution = ResolutionScope.RUNTIME, threadSafe = true)
-public class MergeMojo extends AbstractMojo {
+public class MergeMojo extends SbomMojo {
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
@@ -51,11 +50,17 @@ public class MergeMojo extends AbstractMojo {
     private boolean skip;
 
     @Override
-    public void execute() throws MojoFailureException {
-        if (skip) {
-            getLog().info("Skipping SBOM merge");
-            return;
-        }
+    boolean isSkipped() {
+        return skip;
+    }
+
+    @Override
+    String description() {
+        return "SBOM merge";
+    }
+
+    @Override
+    void run() throws MojoFailureException {
         String[] coordinates = host == null ? new String[0] : host.split(":", -1);
         if (coordinates.length != 2 || coordinates[0].isBlank() || coordinates[1].isBlank()) {
             throw new MojoFailureException("host must be groupId:artifactId, got '" + host + "'");
@@ -71,12 +76,8 @@ public class MergeMojo extends AbstractMojo {
             throw new MojoFailureException(host + " is not resolved to a file");
         }
         String nestedResource = resource == null || resource.isBlank() ? "META-INF/sbom/" + artifactId + ".cdx.json" : resource;
-        try {
-            int merged = SbomMerger.mergeFile(targetFile.toPath(), source.toPath(), nestedResource, "pkg:maven/" + groupId + "/" + artifactId + "@");
-            getLog().info("Merged " + merged + " components from " + host + " (" + nestedResource + ") into " + targetFile);
-        } catch (SbomException e) {
-            throw new MojoFailureException(e.getMessage(), e);
-        }
+        int merged = SbomMerger.mergeFile(targetFile.toPath(), source.toPath(), nestedResource, "pkg:maven/" + groupId + "/" + artifactId + "@");
+        getLog().info("Merged " + merged + " components from " + host + " (" + nestedResource + ") into " + targetFile);
     }
 
 }

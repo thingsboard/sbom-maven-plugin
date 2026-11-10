@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Stands in for syft in the integration tests:
+# "syft scan registry:<image>@sha256:<digest> ... --output cyclonedx-json@1.6=<file>" copies
+# data/scan-<first 12 digits of the digest>.cdx.json of the test project to <file>.
+[ "$SYFT_FILE_METADATA_SELECTION" = none ] || { echo "SYFT_FILE_METADATA_SELECTION is not none" >&2; exit 2; }
+for arg; do
+    case "$arg" in
+        registry:*) digest=${arg##*@sha256:} ;;
+        cyclonedx-json@1.6=*) output=${arg#*=} ;;
+    esac
+done
+echo "$*" >> syft.log
+cp "data/scan-$(printf %.12s "$digest").cdx.json" "$output"
