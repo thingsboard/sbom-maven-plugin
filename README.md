@@ -69,10 +69,13 @@ The `merge` goal runs at `process-resources` by default, after `cyclonedx-maven-
 | `manufacturer` | `metadata.manufacturer` | The organization that created the SBOM |
 | `supplier` | `metadata.supplier` | The organization that supplies the software the SBOM describes |
 | `componentManufacturer` | `metadata.component.manufacturer` | The organization that created the software the SBOM describes |
+| `timestamp` (`sbom.metadata.timestamp`) | `metadata.timestamp` | When the SBOM was made. Default: `${project.build.outputTimestamp}` |
 
-Each is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. Also takes `targetFile` (`sbom.metadata.targetFile`) and `skip` (`sbom.metadata.skip`).
+`timestamp` is a date and time with an offset (`2026-01-31T12:00:00Z`) or seconds since 1970, and is written in UTC. `cyclonedx-maven-plugin` leaves the timestamp out of the SBOM when Maven builds reproducibly, that is when `project.build.outputTimestamp` is set; the goal puts that time back, so set the property to the time of the release when you set the release version. Without it, or with the `1980-02-01T00:00:00Z` that newer Maven versions set by themselves, the timestamp of the SBOM stays as it is. The `package` goal copies the timestamp of the application SBOM, and the `image` goal that of the first component with an `sbom`.
 
-The build fails, and the file is left untouched, when nothing is configured, an organization has no name, a url is blank, a contact is empty, the SBOM is older than CycloneDX 1.6, the input or the result fails schema validation, or anything other than these fields would change.
+Each of the first three is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. Also takes `targetFile` (`sbom.metadata.targetFile`) and `skip` (`sbom.metadata.skip`).
+
+The build fails, and the file is left untouched, when nothing is configured, the timestamp is not a date and time with an offset, an organization has no name, a url is blank, a contact is empty, the SBOM is older than CycloneDX 1.6, the input or the result fails schema validation, or anything other than these fields would change.
 
 ## package goal
 

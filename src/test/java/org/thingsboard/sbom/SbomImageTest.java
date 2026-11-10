@@ -131,7 +131,8 @@ class SbomImageTest {
         assertThat(metadata.path("manufacturer")).isEqualTo(packageMetadata.path("manufacturer"));
         assertThat(metadata.path("supplier")).isEqualTo(packageMetadata.path("supplier"));
         assertThat(metadata.path("lifecycles")).isEqualTo(packageMetadata.path("lifecycles"));
-        assertThat(metadata.has("timestamp")).isFalse();
+        // The time the package SBOM was made, not the time of the scan
+        assertThat(metadata.path("timestamp").asText()).isEqualTo(SbomMetadataTest.TIMESTAMP);
         assertThat(metadata.has("properties")).isFalse();
         List<String> tools = new ArrayList<>();
         metadata.path("tools").path("components").forEach(tool -> tools.add(tool.path("name").asText()));

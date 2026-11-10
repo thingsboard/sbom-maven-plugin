@@ -22,6 +22,7 @@ class SbomMetadataTest {
     static final Organization THINGSBOARD = new Organization("ThingsBoard, Inc.", List.of("https://thingsboard.io"),
             List.of(new Contact(null, "security@thingsboard.io", null)));
     static final Organization RESELLER = new Organization("Reseller Ltd", List.of(), List.of());
+    static final String TIMESTAMP = "2026-01-31T12:00:00Z";
 
     @TempDir
     Path tempDir;
@@ -46,6 +47,51 @@ class SbomMetadataTest {
         ((ObjectNode) updated.get("metadata")).remove(List.of("manufacturer", "supplier"));
         ((ObjectNode) updated.get("metadata").get("component")).remove("manufacturer");
         assertThat(updated).isEqualTo(target);
+    }
+
+    @Test
+    void setsTheTimestampAndReplacesTheOneOfTheSbom() {
+        ObjectNode target = Boms.mavenFixture();
+        ((ObjectNode) target.get("metadata")).put("timestamp", "2020-01-01T00:00:00Z");
+
+        ObjectNode updated = SbomMetadata.apply(target, null, null, null, TIMESTAMP);
+
+        assertThat(updated.path("metadata").path("timestamp").asText()).isEqualTo(TIMESTAMP);
+        ((ObjectNode) updated.get("metadata")).put("timestamp", "2020-01-01T00:00:00Z");
+        assertThat(updated).isEqualTo(target);
+    }
+
+    @Test
+    void withoutATimestampTheOneOfTheSbomStays() {
+        ObjectNode target = Boms.mavenFixture();
+        ((ObjectNode) target.get("metadata")).put("timestamp", "2020-01-01T00:00:00Z");
+
+        JsonNode updated = SbomMetadata.apply(target, THINGSBOARD, null, null, null);
+
+        assertThat(updated.path("metadata").path("timestamp").asText()).isEqualTo("2020-01-01T00:00:00Z");
+    }
+
+    @Test
+    void theTimestampIsReadAsMavenReadsItsOutputTimestamp() {
+        assertThat(SbomMetadata.timestamp("2026-01-31T12:00:00Z")).isEqualTo(TIMESTAMP);
+        assertThat(SbomMetadata.timestamp(" 2026-01-31T14:00:00+02:00 ")).isEqualTo(TIMESTAMP);
+        assertThat(SbomMetadata.timestamp("2026-01-31T12:00:00.123Z")).isEqualTo(TIMESTAMP);
+        assertThat(SbomMetadata.timestamp("1769860800")).isEqualTo(TIMESTAMP);
+        // Not set, or switched off with a single character
+        assertThat(SbomMetadata.timestamp(null)).isNull();
+        assertThat(SbomMetadata.timestamp("")).isNull();
+        assertThat(SbomMetadata.timestamp("x")).isNull();
+        // What Maven 3.10 sets when the project does not
+        assertThat(SbomMetadata.timestamp("1980-02-01T00:00:00Z")).isNull();
+    }
+
+    @Test
+    void failsOnATimestampThatIsNotADateAndTimeWithAnOffset() {
+        for (String timestamp : List.of("2026-01-31", "2026-01-31T12:00:00", "yesterday", "${project.build.outputTimestamp}")) {
+            assertThatThrownBy(() -> SbomMetadata.timestamp(timestamp))
+                    .isInstanceOf(SbomException.class)
+                    .hasMessageContaining("Timestamp " + timestamp + " must be a date and time with an offset");
+        }
     }
 
     @Test
@@ -166,10 +212,10 @@ class SbomMetadataTest {
     void writesTheTargetFileInPlace() throws IOException {
         Path file = Files.writeString(tempDir.resolve("application.cdx.json"), Boms.mavenFixture().toPrettyString());
 
-        List<String> fields = SbomMetadata.applyToFile(file, THINGSBOARD, THINGSBOARD, null);
+        List<String> fields = SbomMetadata.applyToFile(file, THINGSBOARD, THINGSBOARD, null, "2026-01-31T14:00:00+02:00");
 
-        assertThat(fields).containsExactly("metadata.manufacturer", "metadata.supplier");
-        assertThat(Boms.MAPPER.readTree(file.toFile())).isEqualTo(SbomMetadata.apply(Boms.mavenFixture(), THINGSBOARD, THINGSBOARD, null));
+        assertThat(fields).containsExactly("metadata.timestamp", "metadata.manufacturer", "metadata.supplier");
+        assertThat(Boms.MAPPER.readTree(file.toFile())).isEqualTo(SbomMetadata.apply(Boms.mavenFixture(), THINGSBOARD, THINGSBOARD, null, TIMESTAMP));
     }
 
     @Test
@@ -177,7 +223,7 @@ class SbomMetadataTest {
         String original = Boms.mavenFixture().toPrettyString();
         Path file = Files.writeString(tempDir.resolve("application.cdx.json"), original);
 
-        assertThatThrownBy(() -> SbomMetadata.applyToFile(file, new Organization("", List.of(), List.of()), null, null))
+        assertThatThrownBy(() -> SbomMetadata.applyToFile(file, new Organization("", List.of(), List.of()), null, null, null))
                 .isInstanceOf(SbomException.class);
 
         assertThat(Files.readString(file)).isEqualTo(original);

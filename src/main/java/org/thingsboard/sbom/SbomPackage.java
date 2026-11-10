@@ -154,7 +154,7 @@ public final class SbomPackage {
 
     private static ObjectNode metadata(JsonNode applicationMetadata, ObjectNode root) {
         ObjectNode metadata = JsonNodeFactory.instance.objectNode();
-        SbomJson.copyFields(applicationMetadata, metadata, "lifecycles", "tools");
+        SbomJson.copyFields(applicationMetadata, metadata, "timestamp", "lifecycles", "tools");
         metadata.set("component", root);
         SbomJson.copyFields(applicationMetadata, metadata, "manufacturer", "supplier");
         return metadata;

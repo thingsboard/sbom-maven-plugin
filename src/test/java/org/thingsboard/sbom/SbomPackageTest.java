@@ -53,7 +53,7 @@ class SbomPackageTest {
 
     static ObjectNode application() {
         ObjectNode merged = SbomMerger.merge(Boms.mavenFixture(), Boms.npmFixture(), Boms.HOST_PREFIX);
-        return SbomMetadata.apply(merged, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD);
+        return SbomMetadata.apply(merged, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.TIMESTAMP);
     }
 
     PackageFile debPackage() {
@@ -112,8 +112,8 @@ class SbomPackageTest {
         assertThat(metadata.path("supplier")).isEqualTo(applicationMetadata.path("supplier"));
         assertThat(metadata.path("tools")).isEqualTo(applicationMetadata.path("tools"));
         assertThat(metadata.path("lifecycles")).isEqualTo(applicationMetadata.path("lifecycles"));
+        assertThat(metadata.path("timestamp").asText()).isEqualTo(SbomMetadataTest.TIMESTAMP);
         assertThat(metadata.has("properties")).isFalse();
-        assertThat(metadata.has("timestamp")).isFalse();
     }
 
     @Test

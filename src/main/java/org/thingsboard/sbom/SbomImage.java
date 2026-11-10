@@ -385,7 +385,7 @@ public final class SbomImage {
                 .findFirst()
                 .map(sbom -> sbom.path("metadata"))
                 .orElse(JsonNodeFactory.instance.objectNode());
-        SbomJson.copyFields(bundledMetadata, metadata, "lifecycles");
+        SbomJson.copyFields(bundledMetadata, metadata, "timestamp", "lifecycles");
         SbomJson.copyFields(os.path("metadata"), metadata, "tools");
         int slash = image.repository().indexOf('/');
         ObjectNode root = metadata.putObject("component");
