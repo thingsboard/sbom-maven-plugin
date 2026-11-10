@@ -43,9 +43,19 @@ class SbomImageTest {
 
     @BeforeEach
     void createPackage() throws IOException {
-        deb = Files.writeString(tempDir.resolve("tb-mqtt-transport.deb"), "deb contents");
-        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
-        packageSbom = SbomPackage.writeAll(applicationSbom, "tb-mqtt-transport", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of()).get(0);
+        BundledComponent component = debComponent(tempDir);
+        deb = component.getFile().toPath();
+        packageSbom = component.getSbom().toPath();
+    }
+
+    /**
+     * The tb-mqtt-transport package and its SBOM, written to the directory, as the component an image installs.
+     */
+    static BundledComponent debComponent(Path directory) throws IOException {
+        Path deb = Files.writeString(directory.resolve("tb-mqtt-transport.deb"), "deb contents");
+        Path applicationSbom = Files.writeString(directory.resolve("application.cdx.json"), SbomPackageTest.application().toPrettyString());
+        Path packageSbom = SbomPackage.writeAll(applicationSbom, "tb-mqtt-transport", "4.4.1", List.of(new PackageFile("deb", deb.toFile(), DEB_PURL, false)), List.of()).get(0);
+        return new BundledComponent("library", null, null, deb.toFile()).sbom(packageSbom.toFile());
     }
 
     static ObjectNode osSbom() {
@@ -459,7 +469,7 @@ class SbomImageTest {
 
         assertThatThrownBy(() -> SbomImage.describe(osSbom(), image, List.of(debComponent())))
                 .isInstanceOf(SbomException.class)
-                .hasMessageContaining("Image tag is blank");
+                .hasMessageContaining("Image version is blank");
     }
 
     @Test

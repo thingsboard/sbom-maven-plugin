@@ -65,9 +65,12 @@
                             <goal>image</goal>
                         </goals>
                         <configuration>
-                            <osSbom>${project.basedir}/data/os.cdx.json</osSbom>
                             <repository>example/app</repository>
-                            <outputFile>${project.build.directory}/sbom/image-amd64.cdx.json</outputFile>
+                            <tags>
+                                <tag>latest</tag>
+                                <tag>${project.version}</tag>
+                            </tags>
+                            <scanExclude>/usr/share/app/**</scanExclude>
                             <components>
                                 <component>
                                     <sbom>${project.basedir}/dist/app.deb.cdx.json</sbom>

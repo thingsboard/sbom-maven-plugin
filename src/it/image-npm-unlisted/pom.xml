@@ -28,9 +28,7 @@
                             <goal>image</goal>
                         </goals>
                         <configuration>
-                            <osSbom>${project.basedir}/data/os-${sbom.image.architecture}.cdx.json</osSbom>
                             <repository>example/app</repository>
-                            <outputFile>${project.build.directory}/sbom/image-${sbom.image.architecture}.cdx.json</outputFile>
                             <components>
                                 <component>
                                     <sbom>${project.basedir}/data/app.cdx.json</sbom>
@@ -44,7 +42,7 @@
                                     <type>application</type>
                                     <name>chrome-for-testing</name>
                                     <version>${chromium.version}</version>
-                                    <purl>pkg:generic/google/chrome-for-testing@${chromium.version}?os=linux&amp;arch=${sbom.image.architecture}</purl>
+                                    <purl>pkg:generic/google/chrome-for-testing@${chromium.version}?os=linux&amp;arch=@{architecture}</purl>
                                 </component>
                             </components>
                         </configuration>

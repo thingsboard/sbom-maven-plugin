@@ -6,7 +6,7 @@ def imageRef = 'pkg:docker/example/app@sha256%3Aa99a84223d27deef5f4c21a5ce0ef4c4
 def appRef = 'pkg:maven/org.example.it/app@1.0'
 def uiRef = 'pkg:maven/org.example.it/ui@1.0'
 def chromeRef = 'pkg:generic/google/chrome-for-testing@156.0.8078.4?os=linux&arch=arm64'
-def image = new JsonSlurper().parse(new File(basedir, 'target/sbom/image-arm64.cdx.json'))
+def image = new JsonSlurper().parse(new File(basedir, 'target/sbom/example_app_1.0_arm64_a99a84223d27.cdx.json'))
 def refs = image.components*.'bom-ref'
 assert refs.containsAll([appRef, uiRef, chromeRef, 'pkg:npm/express@5.1.0', 'pkg:npm/%40example/native@2.0.0',
                          'pkg:npm/%40example/native-linux-arm64@2.0.0', 'pkg:npm/hugerte@1.0.14'])
@@ -16,4 +16,8 @@ assert image.dependencies.find { it.ref == imageRef }.dependsOn as Set == ['os:d
                                                                           'pkg:npm/express@5.1.0?package-id=0000000000000006'] as Set
 assert image.dependencies.find { it.ref == 'pkg:npm/%40example/native@2.0.0' }.dependsOn == ['pkg:npm/%40example/native-linux-arm64@2.0.0']
 assert image.metadata.component.manufacturer == [name: 'Example, Inc.']
+assert image.metadata.component.purl == imageRef
+assert new File(basedir, 'syft.log').text.startsWith('scan registry:registry.example.com:5000/example/app@sha256:a99a84223d27')
+assert !new File(basedir, 'target/sbom/oras.log').exists()
+assert new File(basedir, 'build.log').text.contains('Not attaching the image SBOMs')
 true

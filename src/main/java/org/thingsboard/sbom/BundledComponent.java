@@ -10,6 +10,8 @@ import java.util.Objects;
 
 public class BundledComponent {
 
+    private static final String ARCHITECTURE = "@{architecture}";
+
     private String type = "library";
     private String group;
     private String name;
@@ -26,6 +28,23 @@ public class BundledComponent {
     private List<String> packages = new ArrayList<>();
 
     public BundledComponent() {}
+
+    private BundledComponent(BundledComponent other) {
+        this.type = other.type;
+        this.group = other.group;
+        this.name = other.name;
+        this.version = other.version;
+        this.description = other.description;
+        this.purl = other.purl;
+        this.cpe = other.cpe;
+        this.license = other.license;
+        this.supplier = other.supplier;
+        this.file = other.file;
+        this.sbom = other.sbom;
+        this.installDir = other.installDir;
+        this.bundleDir = other.bundleDir;
+        this.packages = other.packages;
+    }
 
     BundledComponent(String type, String name, String version, File file) {
         this.type = type;
@@ -138,6 +157,21 @@ public class BundledComponent {
 
     public List<String> getPackages() {
         return packages == null ? List.of() : packages;
+    }
+
+    /**
+     * The component for one architecture of an image: {@code @{architecture}} in its version, purl and cpe is replaced.
+     */
+    BundledComponent forArchitecture(String architecture) {
+        BundledComponent component = new BundledComponent(this);
+        component.version = forArchitecture(version, architecture);
+        component.purl = forArchitecture(purl, architecture);
+        component.cpe = forArchitecture(cpe, architecture);
+        return component;
+    }
+
+    private static String forArchitecture(String value, String architecture) {
+        return value == null ? null : value.replace(ARCHITECTURE, architecture);
     }
 
     String ref() {
