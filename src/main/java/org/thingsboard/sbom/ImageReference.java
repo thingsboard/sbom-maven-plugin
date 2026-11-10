@@ -8,16 +8,19 @@ package org.thingsboard.sbom;
 record ImageReference(String registry, String name) {
 
     private static final String DOCKER_HUB = "docker.io";
+    private static final String DOCKER_HUB_INDEX = "index.docker.io";
 
     /**
      * Reads {@code [<registry>/]<namespace>/<name>} as Docker does: the first part is a registry when it looks like a host.
+     * Docker Hub spelled out is Docker Hub, so that an image has one identity however its repository is written.
      */
     static ImageReference parse(String repository) {
         String host = repository == null ? "" : repository.substring(0, Math.max(repository.indexOf('/'), 0));
         boolean hasRegistry = host.contains(".") || host.contains(":") || host.equals("localhost");
         String name = hasRegistry ? repository.substring(host.length() + 1) : repository;
         SbomImage.checkRepository(name);
-        return new ImageReference(hasRegistry ? host : null, name);
+        boolean onDockerHub = !hasRegistry || host.equals(DOCKER_HUB) || host.equals(DOCKER_HUB_INDEX);
+        return new ImageReference(onDockerHub ? null : host, name);
     }
 
     /**

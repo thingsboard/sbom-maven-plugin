@@ -71,6 +71,9 @@ class ImageToolsTest {
         ImageReference onDockerHub = ImageReference.parse("thingsboard/tb-node");
         assertThat(onDockerHub).isEqualTo(new ImageReference(null, "thingsboard/tb-node")).hasToString("thingsboard/tb-node");
         assertThat(onDockerHub.qualified()).isEqualTo("docker.io/thingsboard/tb-node");
+        // Docker Hub spelled out is the same image
+        assertThat(ImageReference.parse("docker.io/thingsboard/tb-node")).isEqualTo(onDockerHub);
+        assertThat(ImageReference.parse("index.docker.io/thingsboard/tb-node")).isEqualTo(onDockerHub);
 
         for (String registry : List.of("localhost:5000", "localhost", "registry.example.com")) {
             ImageReference elsewhere = ImageReference.parse(registry + "/thingsboard/tb-node");
