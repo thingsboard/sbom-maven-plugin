@@ -10,7 +10,7 @@ import java.io.File;
 import java.util.List;
 
 /**
- * Sets who makes and supplies the software and the SBOM (CycloneDX 1.6 or later).
+ * Sets who makes and supplies the software and the SBOM (CycloneDX 1.6 or later), and when the SBOM was made.
  * Configured fields replace existing values; fields that are not configured are left as they are.
  * Each organization has a {@code name}, optional {@code urls} and optional {@code contacts} ({@code name}, {@code email}, {@code phone}).
  * The file is left untouched when any check fails. Runs at {@code process-resources} by default.
@@ -43,6 +43,14 @@ public class MetadataMojo extends SbomMojo {
     private Organization componentManufacturer;
 
     /**
+     * When the SBOM was made; sets {@code metadata.timestamp}. By default the time Maven builds reproducibly with,
+     * which {@code cyclonedx-maven-plugin} leaves out of its SBOMs: a date and time with an offset
+     * ({@code 2026-01-31T12:00:00Z}) or seconds since 1970. Not set, or left at the {@code 1980-02-01T00:00:00Z} that Maven sets by itself, the timestamp of the SBOM stays as it is.
+     */
+    @Parameter(property = "sbom.metadata.timestamp", defaultValue = "${project.build.outputTimestamp}")
+    private String timestamp;
+
+    /**
      * Skip setting the metadata.
      */
     @Parameter(property = "sbom.metadata.skip", defaultValue = "false")
@@ -60,7 +68,7 @@ public class MetadataMojo extends SbomMojo {
 
     @Override
     void run() {
-        List<String> fields = SbomMetadata.applyToFile(targetFile.toPath(), manufacturer, supplier, componentManufacturer);
+        List<String> fields = SbomMetadata.applyToFile(targetFile.toPath(), manufacturer, supplier, componentManufacturer, timestamp);
         getLog().info("Set " + String.join(", ", fields) + " in " + targetFile);
     }
 

@@ -15,6 +15,8 @@
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- cyclonedx-maven-plugin leaves the timestamp out of a reproducible build: the metadata goal sets it -->
+        <project.build.outputTimestamp>2026-01-31T14:00:00+02:00</project.build.outputTimestamp>
     </properties>
     <modules>
         <module>ui</module>
