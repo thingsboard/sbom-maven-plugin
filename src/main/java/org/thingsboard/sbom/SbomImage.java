@@ -182,7 +182,7 @@ public final class SbomImage {
 
     private record ScannedPackage(String ref, PackageURL purl) {}
 
-    private static PackageURL parsePurl(String purl) {
+    static PackageURL parsePurl(String purl) {
         try {
             return purl.isEmpty() ? null : new PackageURL(purl);
         } catch (MalformedPackageURLException e) {

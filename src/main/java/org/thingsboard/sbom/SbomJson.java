@@ -64,6 +64,12 @@ final class SbomJson {
         }
     }
 
+    static void putLicense(ObjectNode component, String expression) {
+        if (expression != null && !expression.isBlank()) {
+            component.putArray("licenses").addObject().put("expression", expression);
+        }
+    }
+
     static ArrayNode hashesJson(Map<String, String> hashes) {
         ArrayNode json = JsonNodeFactory.instance.arrayNode();
         hashes.forEach((alg, content) -> json.addObject().put("alg", alg).put("content", content));

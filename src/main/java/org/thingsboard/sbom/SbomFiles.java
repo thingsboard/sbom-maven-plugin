@@ -37,19 +37,32 @@ final class SbomFiles {
         }
     }
 
-    static void writeFile(Path file, JsonNode bom) {
+    /**
+     * @return the bytes written
+     */
+    static byte[] writeFile(Path file, JsonNode bom) {
         try {
             Path parent = file.toAbsolutePath().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            MAPPER.writeValue(file.toFile(), bom);
+            byte[] bytes = MAPPER.writeValueAsBytes(bom);
+            Files.write(file, bytes);
+            return bytes;
         } catch (IOException e) {
             throw new SbomException("Failed to write " + file, e);
         }
     }
 
     static Map<String, String> hashes(Path file) {
+        try (InputStream in = Files.newInputStream(file)) {
+            return hashes(in, file.toString());
+        } catch (IOException e) {
+            throw new SbomException("Failed to read " + file, e);
+        }
+    }
+
+    static Map<String, String> hashes(InputStream in, String source) {
         Map<String, MessageDigest> digests = new LinkedHashMap<>();
         try {
             for (String alg : HASH_ALGORITHMS) {
@@ -59,7 +72,7 @@ final class SbomFiles {
             throw new IllegalStateException(e);
         }
         byte[] buffer = new byte[1 << 16];
-        try (InputStream in = Files.newInputStream(file)) {
+        try {
             int read;
             while ((read = in.read(buffer)) != -1) {
                 for (MessageDigest digest : digests.values()) {
@@ -67,7 +80,7 @@ final class SbomFiles {
                 }
             }
         } catch (IOException e) {
-            throw new SbomException("Failed to read " + file, e);
+            throw new SbomException("Failed to read " + source, e);
         }
         Map<String, String> result = new LinkedHashMap<>();
         digests.forEach((alg, digest) -> result.put(alg, HexFormat.of().formatHex(digest.digest())));

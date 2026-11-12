@@ -162,9 +162,7 @@ final class BundledComponents {
                 json.set("hashes", hashesJson(SbomFiles.hashes(file)));
             }
         }
-        if (component.getLicense() != null && !component.getLicense().isBlank()) {
-            json.putArray("licenses").addObject().put("expression", component.getLicense());
-        }
+        SbomJson.putLicense(json, component.getLicense());
         if (component.getPurl() != null && !component.getPurl().isBlank()) {
             SbomChecks.checkPurl("Bundled component " + component.getName(), component.getPurl());
             json.put("purl", component.getPurl());
