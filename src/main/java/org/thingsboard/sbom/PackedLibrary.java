@@ -14,6 +14,15 @@ public class PackedLibrary {
     private String description;
     private String license;
 
+    public PackedLibrary() {}
+
+    PackedLibrary(String group, String name, String description, String license) {
+        this.group = group;
+        this.name = name;
+        this.description = description;
+        this.license = license;
+    }
+
     public String getGroup() {
         return group;
     }

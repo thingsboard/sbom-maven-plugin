@@ -115,7 +115,7 @@ The goal must run after the goal that packs the jar and before anything that rea
 
 | Parameter | Property | Default | Description |
 | --- | --- | --- | --- |
-| `jar` | `sbom.reconcile.jar` | `${project.build.directory}/${project.build.finalName}.jar` | The jar that packs the libraries |
+| `jar` | `sbom.reconcile.jar` | `${project.build.directory}/${project.build.finalName}.jar` | The jar that packs the libraries. The build fails when it packs none or does not embed the SBOM |
 | `libraryDirectory` | `sbom.reconcile.libraryDirectory` | `BOOT-INF/lib` | The directory of the jar that holds the libraries |
 | `sbomFile` | `sbom.reconcile.sbomFile` | `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json` | SBOM to correct, rewritten in place |
 | `resource` | `sbom.reconcile.resource` | `META-INF/sbom/application.cdx.json` | Path of the SBOM inside a jar |
@@ -123,7 +123,7 @@ The goal must run after the goal that packs the jar and before anything that rea
 | `libraries` | | | Libraries that the packaging adds and that are not Maven dependencies of the project: `group`, `name`, and optionally `license` and `description`. The file in the jar is `<name>-<version>.jar`, where the version is the `Implementation-Version` of its manifest, or else what follows the name in the file name |
 | `skip` | `sbom.reconcile.skip` | `false` | Skip the reconciliation |
 
-A component and a packed library are the same thing when their SHA-256 hashes are equal, or else when the file has the name Maven gives the component, `<artifactId>-<version>[-<classifier>].jar`. Only Maven components of type `jar` are compared.
+A component and a packed library are the same thing when their SHA-256 hashes are equal, or else when the file has the name Maven gives the component, `<artifactId>-<version>[-<classifier>].jar`. Only Maven components whose file is a jar are compared: type `jar`, `test-jar` and the like.
 
 - A packed library without a component gets one. A Maven dependency of the project gets its coordinates from Maven, and what its pom says (license, links) from a listed component of the same group, name and version. Any other library must be declared in `libraries`, or the build fails.
 - A component without a packed library is removed, and what depended on it depends on its dependencies.

@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Makes the Maven libraries of an SBOM equal to the libraries packed in a jar.
@@ -31,7 +32,8 @@ import java.util.function.Function;
  * <li>A component without a packed library is removed, and what depended on it depends on its dependencies instead.</li>
  * <li>A component whose hashes differ from those of its packed library gets the hashes of the packed library.</li>
  * </ul>
- * Only Maven components of type {@code jar} are compared; every other component is left as it is.
+ * Only Maven components whose file is a jar are compared (type {@code jar}, {@code test-jar} and the like); every other
+ * component is left as it is.
  */
 final class SbomReconciler {
 
@@ -46,22 +48,28 @@ final class SbomReconciler {
 
     }
 
+    /**
+     * The artifact types of Maven itself whose file is a {@code .jar}. A build can add more, see {@code reconcile}.
+     */
+    static final Set<String> MAVEN_JAR_TYPES = Set.of("jar", "test-jar", "ejb", "ejb-client", "maven-plugin", "java-source", "javadoc");
+
     private SbomReconciler() {}
 
     /**
+     * @param jarTypes the Maven artifact types whose file is a {@code .jar}
      * @param identify gives the component of a packed library that the SBOM does not list, without {@code hashes}
      */
-    static Result reconcile(JsonNode source, List<Library> libraries, Function<Library, Optional<ObjectNode>> identify) {
+    static Result reconcile(JsonNode source, List<Library> libraries, Set<String> jarTypes, Function<Library, Optional<ObjectNode>> identify) {
         SbomChecks.checkInput("Source", source);
         ObjectNode bom = (ObjectNode) source.deepCopy();
         ArrayNode components = bom.withArrayProperty("components");
 
-        Map<String, ObjectNode> bySha256 = new HashMap<>();
+        Map<String, List<ObjectNode>> bySha256 = new HashMap<>();
         Map<String, ObjectNode> byFileName = new HashMap<>();
         Set<String> unmatched = new LinkedHashSet<>();
         for (JsonNode node : components) {
             ObjectNode component = (ObjectNode) node;
-            String fileName = fileName(component);
+            String fileName = fileName(component, jarTypes);
             if (fileName == null) {
                 continue;
             }
@@ -69,26 +77,32 @@ final class SbomReconciler {
             byFileName.putIfAbsent(fileName, component);
             String sha256 = sha256(component);
             if (sha256 != null) {
-                bySha256.putIfAbsent(sha256, component);
+                bySha256.computeIfAbsent(sha256, key -> new ArrayList<>()).add(component);
             }
         }
 
-        List<String> added = new ArrayList<>();
+        // The surest match first, so a library with the bytes of another one cannot take the component of that one
+        List<Library> pending = new ArrayList<>(libraries);
+        pending.removeIf(library -> {
+            ObjectNode component = byFileName.get(library.fileName());
+            return component != null && library.sha256().equals(sha256(component)) && unmatched.remove(ref(component));
+        });
+        pending.removeIf(library -> bySha256.getOrDefault(library.sha256(), List.of()).stream().anyMatch(component -> unmatched.remove(ref(component))));
         List<String> rehashed = new ArrayList<>();
+        pending.removeIf(library -> {
+            ObjectNode component = byFileName.get(library.fileName());
+            if (component == null || !unmatched.remove(ref(component))) {
+                return false;
+            }
+            component.set("hashes", SbomJson.hashesJson(library.hashes()));
+            rehashed.add(ref(component));
+            return true;
+        });
+
+        List<String> added = new ArrayList<>();
         List<String> unknown = new ArrayList<>();
         List<ObjectNode> newComponents = new ArrayList<>();
-        for (Library library : libraries) {
-            ObjectNode component = bySha256.get(library.sha256());
-            if (component == null || !unmatched.contains(ref(component))) {
-                component = byFileName.get(library.fileName());
-            }
-            if (component != null && unmatched.remove(ref(component))) {
-                if (!library.sha256().equals(sha256(component))) {
-                    component.set("hashes", SbomJson.hashesJson(library.hashes()));
-                    rehashed.add(ref(component));
-                }
-                continue;
-            }
+        for (Library library : pending) {
             Optional<ObjectNode> identified = identify.apply(library);
             if (identified.isEmpty()) {
                 unknown.add(library.fileName());
@@ -118,15 +132,7 @@ final class SbomReconciler {
             (parents.isEmpty() ? Set.of(rootRef) : parents).forEach(parent -> graph.computeIfAbsent(parent, key -> new LinkedHashSet<>()).add(newRef));
         }
 
-        for (String removedRef : unmatched) {
-            Set<String> targets = graph.getOrDefault(removedRef, Set.of());
-            graph.remove(removedRef);
-            for (Set<String> dependsOn : graph.values()) {
-                if (dependsOn.remove(removedRef)) {
-                    dependsOn.addAll(targets);
-                }
-            }
-        }
+        unlink(graph, unmatched);
         graph.forEach((from, dependsOn) -> dependsOn.remove(from));
         for (Iterator<JsonNode> iterator = components.iterator(); iterator.hasNext(); ) {
             if (unmatched.contains(ref(iterator.next()))) {
@@ -140,15 +146,32 @@ final class SbomReconciler {
     }
 
     /**
-     * The name Maven gives the file of a component, or null for a component that is not a Maven jar.
+     * Takes components out of the graph: what depended on a removed component depends on what that component depended on,
+     * through any number of removed components.
      */
-    static String fileName(JsonNode component) {
+    private static void unlink(Map<String, Set<String>> graph, Set<String> removed) {
+        // Only removed components have edges here, so following them stops at the first component that stays
+        Map<String, Set<String>> removedDependsOn = new HashMap<>();
+        removed.forEach(ref -> removedDependsOn.put(ref, graph.getOrDefault(ref, Set.of())));
+        graph.keySet().removeAll(removed);
+        for (Set<String> dependsOn : graph.values()) {
+            Set<String> reached = new LinkedHashSet<>();
+            dependsOn.stream().filter(removed::contains).toList().forEach(ref -> SbomChecks.reachableFrom(ref, removedDependsOn, reached));
+            dependsOn.addAll(reached);
+            dependsOn.removeAll(removed);
+        }
+    }
+
+    /**
+     * The name Maven gives the file of a component, or null for a component whose file is not a Maven jar.
+     */
+    static String fileName(JsonNode component, Set<String> jarTypes) {
         PackageURL purl = SbomImage.parsePurl(component.path("purl").asText());
         if (purl == null || !PackageURL.StandardTypes.MAVEN.equals(purl.getType()) || purl.getVersion() == null) {
             return null;
         }
         Map<String, String> qualifiers = purl.getQualifiers() == null ? Map.of() : purl.getQualifiers();
-        if (!"jar".equals(qualifiers.getOrDefault("type", "jar"))) {
+        if (!jarTypes.contains(qualifiers.getOrDefault("type", "jar"))) {
             return null;
         }
         return fileName(purl.getName(), purl.getVersion(), qualifiers.get("classifier"));
@@ -159,10 +182,10 @@ final class SbomReconciler {
     }
 
     /**
-     * A component for a Maven jar, with the purl and reference that cyclonedx-maven-plugin gives such an artifact.
+     * A component for a Maven artifact whose file is a jar, with the purl and reference that cyclonedx-maven-plugin gives such an artifact.
      */
-    static ObjectNode mavenComponent(String group, String artifactId, String version, String classifier) {
-        TreeMap<String, String> qualifiers = new TreeMap<>(Map.of("type", "jar"));
+    static ObjectNode mavenComponent(String group, String artifactId, String version, String classifier, String type) {
+        TreeMap<String, String> qualifiers = new TreeMap<>(Map.of("type", type));
         if (classifier != null && !classifier.isEmpty()) {
             qualifiers.put("classifier", classifier);
         }
@@ -181,6 +204,35 @@ final class SbomReconciler {
         component.put("scope", "required");
         component.put("purl", purl);
         return component;
+    }
+
+    /**
+     * A component for the declared library whose file is the packed one, {@code <name>-<version>.jar}.
+     *
+     * @param statedVersion gives the version the packed library states about itself, or null when it states none
+     */
+    static Optional<ObjectNode> declared(List<PackedLibrary> libraries, String fileName, Supplier<String> statedVersion) {
+        String stated = null;
+        for (PackedLibrary declared : libraries) {
+            String prefix = declared.getName() + "-";
+            if (!fileName.startsWith(prefix) || !fileName.endsWith(".jar")) {
+                continue;
+            }
+            if (stated == null) {
+                stated = Optional.ofNullable(statedVersion.get()).orElse("");
+            }
+            // The library says its version itself; the file name tells it only when the library does not
+            String version = stated.isEmpty() ? fileName.substring(prefix.length(), fileName.length() - ".jar".length()) : stated;
+            if (!fileName.equals(fileName(declared.getName(), version, null))) {
+                continue;
+            }
+            SbomChecks.check(declared.getGroup() != null && !declared.getGroup().isBlank(), "Library " + declared.getName() + " has no group");
+            ObjectNode component = mavenComponent(declared.getGroup(), declared.getName(), version, null, "jar");
+            SbomJson.putIfPresent(component, "description", declared.getDescription());
+            SbomJson.putLicense(component, declared.getLicense());
+            return Optional.of(component);
+        }
+        return Optional.empty();
     }
 
     /**

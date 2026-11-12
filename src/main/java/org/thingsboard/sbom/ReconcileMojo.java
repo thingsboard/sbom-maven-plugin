@@ -16,8 +16,11 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Makes the project's SBOM equal to what the packaging put into the jar, and puts the corrected SBOM into the jar.
@@ -28,7 +31,7 @@ import java.util.Optional;
  * that is neither a Maven dependency of the project nor declared in {@code libraries}.
  * Bind it after the goal that packs the jar and before anything that reads the jar or the SBOM.
  */
-@Mojo(name = "reconcile", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.RUNTIME, threadSafe = true)
+@Mojo(name = "reconcile", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, threadSafe = true)
 public class ReconcileMojo extends SbomMojo {
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
@@ -53,7 +56,7 @@ public class ReconcileMojo extends SbomMojo {
     private File sbomFile;
 
     /**
-     * Path of the SBOM inside a jar. It is replaced in {@code jar} and in each of {@code otherJars}.
+     * Path of the SBOM inside a jar. It is replaced in {@code jar}, which must embed it, and in each of {@code otherJars}.
      */
     @Parameter(property = "sbom.reconcile.resource", defaultValue = "META-INF/sbom/application.cdx.json")
     private String resource;
@@ -94,7 +97,14 @@ public class ReconcileMojo extends SbomMojo {
         SbomChecks.check(Files.isRegularFile(jarPath), "Jar " + jarPath + " does not exist. Bind this goal after the goal that packs it");
         JsonNode source = SbomFiles.readFile(sbomPath);
         List<Library> packed = JarLibraries.read(jarPath, libraryDirectory);
-        SbomReconciler.Result result = SbomReconciler.reconcile(source, packed, library -> identify(library, source));
+        SbomChecks.check(!packed.isEmpty(), "Jar " + jarPath + " packs no libraries in " + libraryDirectory
+                + ". Set the jar parameter to the jar that packs them");
+        SbomChecks.check(JarLibraries.hasEntry(jarPath, resource), "Jar " + jarPath + " does not embed the SBOM at " + resource
+                + ", so a corrected SBOM could not be put into it. Set the resource parameter to the path of the SBOM inside the jar");
+        // What a build extension makes a jar is a jar too
+        Set<String> jarTypes = new HashSet<>(SbomReconciler.MAVEN_JAR_TYPES);
+        project.getArtifacts().stream().filter(ReconcileMojo::isJar).forEach(artifact -> jarTypes.add(artifact.getType()));
+        SbomReconciler.Result result = SbomReconciler.reconcile(source, packed, jarTypes, library -> identify(library, source));
 
         result.added().forEach(ref -> getLog().info("Added to the SBOM, packed but not listed: " + ref));
         result.removed().forEach(ref -> getLog().info("Removed from the SBOM, listed but not packed: " + ref));
@@ -104,11 +114,11 @@ public class ReconcileMojo extends SbomMojo {
             return;
         }
         byte[] content = SbomFiles.writeFile(sbomPath, result.bom());
-        List<File> jars = new ArrayList<>(List.of(jar));
-        jars.addAll(otherJars);
-        for (File target : jars) {
-            if (target.isFile() && JarEntryReplacer.replace(target.toPath(), resource, content)) {
-                getLog().info("Replaced " + resource + " in " + target);
+        JarEntryReplacer.replace(jarPath, resource, content);
+        getLog().info("Replaced " + resource + " in " + jar);
+        for (File other : otherJars) {
+            if (other.isFile() && JarEntryReplacer.replace(other.toPath(), resource, content)) {
+                getLog().info("Replaced " + resource + " in " + other);
             }
         }
         getLog().info("Reconciled " + sbomFile + " with the " + packed.size() + " libraries of " + jarPath.getFileName()
@@ -120,39 +130,31 @@ public class ReconcileMojo extends SbomMojo {
      * missed, or else a declared library.
      */
     private Optional<ObjectNode> identify(Library library, JsonNode bom) {
-        for (Artifact artifact : project.getArtifacts()) {
+        Optional<ObjectNode> resolved = resolved(project.getArtifacts(), library);
+        resolved.ifPresent(component -> SbomReconciler.copyPomFields(bom, component));
+        return resolved.or(() -> SbomReconciler.declared(libraries, library.fileName(),
+                () -> JarLibraries.implementationVersion(jar.toPath(), libraryDirectory, library.fileName())));
+    }
+
+    /**
+     * A component for the artifact, among those Maven resolved, whose file has the name of the packed library.
+     */
+    static Optional<ObjectNode> resolved(Collection<Artifact> artifacts, Library library) {
+        for (Artifact artifact : artifacts) {
             File file = artifact.getFile();
-            if (file == null || !file.isFile()
+            if (file == null || !file.isFile() || !isJar(artifact)
                     || !SbomReconciler.fileName(artifact.getArtifactId(), artifact.getBaseVersion(), artifact.getClassifier()).equals(library.fileName())) {
                 continue;
             }
             SbomChecks.check(library.sha256().equals(SbomFiles.hashes(file.toPath()).get("SHA-256")),
                     "The jar packs " + library.fileName() + " with other content than the file Maven resolved: " + file);
-            ObjectNode component = SbomReconciler.mavenComponent(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion(), artifact.getClassifier());
-            SbomReconciler.copyPomFields(bom, component);
-            return Optional.of(component);
-        }
-        String stated = null;
-        for (PackedLibrary declared : libraries) {
-            String prefix = declared.getName() + "-";
-            if (!library.fileName().startsWith(prefix) || !library.fileName().endsWith(".jar")) {
-                continue;
-            }
-            if (stated == null) {
-                stated = Optional.ofNullable(JarLibraries.implementationVersion(jar.toPath(), libraryDirectory, library.fileName())).orElse("");
-            }
-            // The library says its version itself; the file name tells it only when the library does not
-            String version = stated.isEmpty() ? library.fileName().substring(prefix.length(), library.fileName().length() - ".jar".length()) : stated;
-            if (!library.fileName().equals(SbomReconciler.fileName(declared.getName(), version, null))) {
-                continue;
-            }
-            SbomChecks.check(declared.getGroup() != null && !declared.getGroup().isBlank(), "Library " + declared.getName() + " has no group");
-            ObjectNode component = SbomReconciler.mavenComponent(declared.getGroup(), declared.getName(), version, null);
-            SbomJson.putIfPresent(component, "description", declared.getDescription());
-            SbomJson.putLicense(component, declared.getLicense());
-            return Optional.of(component);
+            return Optional.of(SbomReconciler.mavenComponent(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion(), artifact.getClassifier(), artifact.getType()));
         }
         return Optional.empty();
+    }
+
+    private static boolean isJar(Artifact artifact) {
+        return "jar".equals(artifact.getArtifactHandler().getExtension());
     }
 
 }

@@ -59,6 +59,14 @@ final class JarLibraries {
         return libraries;
     }
 
+    static boolean hasEntry(Path jar, String name) {
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            return zip.getEntry(name) != null;
+        } catch (IOException e) {
+            throw new SbomException("Failed to read " + jar, e);
+        }
+    }
+
     /**
      * The version a packed library states about itself, as {@code Implementation-Version} in its manifest, or null when it states none.
      */
