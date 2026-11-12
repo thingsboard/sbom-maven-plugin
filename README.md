@@ -120,10 +120,10 @@ The goal must run after the goal that packs the jar and before anything that rea
 | `sbomFile` | `sbom.reconcile.sbomFile` | `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json` | SBOM to correct, rewritten in place |
 | `resource` | `sbom.reconcile.resource` | `META-INF/sbom/application.cdx.json` | Path of the SBOM inside a jar |
 | `otherJars` | | | Other jars of the project that embed the same SBOM. One that does not exist or does not embed it is passed over |
-| `libraries` | | | Libraries that the packaging adds and that are not Maven dependencies of the project: `group`, `name`, and optionally `license` and `description`. The file in the jar is `<name>-<version>.jar`, where the version is the `Implementation-Version` of its manifest, or else what follows the name in the file name |
+| `libraries` | | | Libraries that the packaging adds and that are not Maven dependencies of the project: `group`, `name`, and optionally `license` and `description`. The file in the jar is `<name>-<version>.jar`, where the version starts with a digit or is the `Implementation-Version` of the manifest of the library |
 | `skip` | `sbom.reconcile.skip` | `false` | Skip the reconciliation |
 
-A component and a packed library are the same thing when their SHA-256 hashes are equal, or else when the file has the name Maven gives the component, `<artifactId>-<version>[-<classifier>].jar`. Only Maven components whose file is a jar are compared: type `jar`, `test-jar` and the like.
+A component and a packed library are the same thing when their SHA-256 hashes are equal, or else when the file has the name Maven gives the component, `<artifactId>-<version>[-<classifier>].jar`. Only Maven components whose file is a jar are compared: type `jar`, `test-jar` and every other type that Maven or a build extension gives the extension `jar`.
 
 - A packed library without a component gets one. A Maven dependency of the project gets its coordinates from Maven, and what its pom says (license, links) from a listed component of the same group, name and version. Any other library must be declared in `libraries`, or the build fails.
 - A component without a packed library is removed, and what depended on it depends on its dependencies.

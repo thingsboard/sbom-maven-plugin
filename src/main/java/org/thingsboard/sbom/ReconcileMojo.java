@@ -5,6 +5,7 @@ package org.thingsboard.sbom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -12,15 +13,14 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.thingsboard.sbom.JarLibraries.Library;
 
+import javax.inject.Inject;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Makes the project's SBOM equal to what the packaging put into the jar, and puts the corrected SBOM into the jar.
@@ -36,6 +36,12 @@ public class ReconcileMojo extends SbomMojo {
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
+
+    /**
+     * Knows the file extension of every artifact type of the build, those of build extensions included.
+     */
+    @Inject
+    private ArtifactHandlerManager artifactHandlerManager;
 
     /**
      * The jar that packs the libraries.
@@ -101,10 +107,8 @@ public class ReconcileMojo extends SbomMojo {
                 + ". Set the jar parameter to the jar that packs them");
         SbomChecks.check(JarLibraries.hasEntry(jarPath, resource), "Jar " + jarPath + " does not embed the SBOM at " + resource
                 + ", so a corrected SBOM could not be put into it. Set the resource parameter to the path of the SBOM inside the jar");
-        // What a build extension makes a jar is a jar too
-        Set<String> jarTypes = new HashSet<>(SbomReconciler.MAVEN_JAR_TYPES);
-        project.getArtifacts().stream().filter(ReconcileMojo::isJar).forEach(artifact -> jarTypes.add(artifact.getType()));
-        SbomReconciler.Result result = SbomReconciler.reconcile(source, packed, jarTypes, library -> identify(library, source));
+        SbomReconciler.Result result = SbomReconciler.reconcile(source, packed,
+                type -> "jar".equals(artifactHandlerManager.getArtifactHandler(type).getExtension()), library -> identify(library, source));
 
         result.added().forEach(ref -> getLog().info("Added to the SBOM, packed but not listed: " + ref));
         result.removed().forEach(ref -> getLog().info("Removed from the SBOM, listed but not packed: " + ref));

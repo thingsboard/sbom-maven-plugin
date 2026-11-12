@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class SbomReconcilerTest {
     private static final String NATIVE = "pkg:maven/org.example/ffi@2.0?classifier=native&type=jar";
     private static final String PLAIN = "pkg:maven/org.example/ffi@2.0?type=jar";
     private static final String NPM = "pkg:npm/left-pad@1.0.0";
-    private static final Set<String> JAR_TYPES = Set.of("jar", "test-jar");
+    private static final Predicate<String> JAR_TYPES = Set.of("jar", "test-jar")::contains;
     private static final PackedLibrary TOOLS = new PackedLibrary("org.example", "tools", "Tools of the packaging", "Apache-2.0");
     private static final Function<Library, Optional<ObjectNode>> NONE = library -> Optional.empty();
 
@@ -99,6 +100,24 @@ class SbomReconcilerTest {
     }
 
     @Test
+    void aLibraryUnderAnotherFileNameIsItsComponentByItsHash() {
+        ObjectNode bom = bom("1.6", "app");
+        component(bom, STARTER, "starter", "1.0", "a");
+        component(bom, CORE, "core", "1.0", "a");
+        component(bom, PLAIN, "ffi", "2.0", "d");
+        dependency(bom, "app", STARTER, CORE, PLAIN);
+        dependency(bom, STARTER);
+        dependency(bom, CORE);
+        dependency(bom, PLAIN);
+
+        // Two components have the hash of the two renamed libraries: each library takes one of them
+        SbomReconciler.Result result = SbomReconciler.reconcile(bom, List.of(library("first.jar", "a"), library("second.jar", "a"),
+                library("third.jar", "d")), JAR_TYPES, NONE);
+
+        assertThat(result.changed()).isFalse();
+    }
+
+    @Test
     void aPackedLibraryThatIsNotListedIsAddedUnderWhatDependsOnItsSibling() {
         SbomReconciler.Result result = SbomReconciler.reconcile(source(), packed(library("ffi-2.0.jar", "d")), JAR_TYPES,
                 library -> Optional.of(component(PLAIN, "ffi", "2.0")));
@@ -135,8 +154,8 @@ class SbomReconcilerTest {
     }
 
     @Test
-    void aDeclaredLibraryTakesTheVersionItStatesItself() {
-        ObjectNode component = SbomReconciler.declared(List.of(TOOLS), "tools-3.5.8.jar", () -> "3.5.8").orElseThrow();
+    void aDeclaredLibraryTakesTheVersionThatFollowsItsNameInTheFileName() {
+        ObjectNode component = SbomReconciler.declared(List.of(TOOLS), "tools-3.5.8.jar", () -> "3.5.8.RELEASE").orElseThrow();
 
         assertThat(component.get("purl").asText()).isEqualTo("pkg:maven/org.example/tools@3.5.8?type=jar");
         assertThat(component.get("bom-ref")).isEqualTo(component.get("purl"));
@@ -145,10 +164,9 @@ class SbomReconcilerTest {
     }
 
     @Test
-    void aDeclaredLibraryThatStatesNoVersionTakesItFromTheFileName() {
-        ObjectNode component = SbomReconciler.declared(List.of(TOOLS), "tools-3.5.8.jar", () -> null).orElseThrow();
-
-        assertThat(component.get("version").asText()).isEqualTo("3.5.8");
+    void aVersionThatStartsWithNoDigitIsTakenWhenTheLibraryStatesIt() {
+        assertThat(SbomReconciler.declared(List.of(TOOLS), "tools-RELEASE.jar", () -> "RELEASE").orElseThrow().get("version").asText()).isEqualTo("RELEASE");
+        assertThat(SbomReconciler.declared(List.of(TOOLS), "tools-RELEASE.jar", () -> null)).isEmpty();
     }
 
     @Test

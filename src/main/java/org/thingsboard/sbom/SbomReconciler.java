@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -48,18 +49,13 @@ final class SbomReconciler {
 
     }
 
-    /**
-     * The artifact types of Maven itself whose file is a {@code .jar}. A build can add more, see {@code reconcile}.
-     */
-    static final Set<String> MAVEN_JAR_TYPES = Set.of("jar", "test-jar", "ejb", "ejb-client", "maven-plugin", "java-source", "javadoc");
-
     private SbomReconciler() {}
 
     /**
-     * @param jarTypes the Maven artifact types whose file is a {@code .jar}
+     * @param jarType  tells whether the file of a Maven artifact type is a {@code .jar}
      * @param identify gives the component of a packed library that the SBOM does not list, without {@code hashes}
      */
-    static Result reconcile(JsonNode source, List<Library> libraries, Set<String> jarTypes, Function<Library, Optional<ObjectNode>> identify) {
+    static Result reconcile(JsonNode source, List<Library> libraries, Predicate<String> jarType, Function<Library, Optional<ObjectNode>> identify) {
         SbomChecks.checkInput("Source", source);
         ObjectNode bom = (ObjectNode) source.deepCopy();
         ArrayNode components = bom.withArrayProperty("components");
@@ -69,7 +65,7 @@ final class SbomReconciler {
         Set<String> unmatched = new LinkedHashSet<>();
         for (JsonNode node : components) {
             ObjectNode component = (ObjectNode) node;
-            String fileName = fileName(component, jarTypes);
+            String fileName = fileName(component, jarType);
             if (fileName == null) {
                 continue;
             }
@@ -165,13 +161,13 @@ final class SbomReconciler {
     /**
      * The name Maven gives the file of a component, or null for a component whose file is not a Maven jar.
      */
-    static String fileName(JsonNode component, Set<String> jarTypes) {
+    static String fileName(JsonNode component, Predicate<String> jarType) {
         PackageURL purl = SbomImage.parsePurl(component.path("purl").asText());
         if (purl == null || !PackageURL.StandardTypes.MAVEN.equals(purl.getType()) || purl.getVersion() == null) {
             return null;
         }
         Map<String, String> qualifiers = purl.getQualifiers() == null ? Map.of() : purl.getQualifiers();
-        if (!jarTypes.contains(qualifiers.getOrDefault("type", "jar"))) {
+        if (!jarType.test(qualifiers.getOrDefault("type", "jar"))) {
             return null;
         }
         return fileName(purl.getName(), purl.getVersion(), qualifiers.get("classifier"));
@@ -207,23 +203,20 @@ final class SbomReconciler {
     }
 
     /**
-     * A component for the declared library whose file is the packed one, {@code <name>-<version>.jar}.
+     * A component for the declared library whose file is the packed one, {@code <name>-<version>.jar}. What follows the
+     * name is taken for a version when it starts with a digit, or else when the library states it as its version: so a
+     * declared name that is only the start of the name of another library does not match that library.
      *
      * @param statedVersion gives the version the packed library states about itself, or null when it states none
      */
     static Optional<ObjectNode> declared(List<PackedLibrary> libraries, String fileName, Supplier<String> statedVersion) {
-        String stated = null;
         for (PackedLibrary declared : libraries) {
             String prefix = declared.getName() + "-";
             if (!fileName.startsWith(prefix) || !fileName.endsWith(".jar")) {
                 continue;
             }
-            if (stated == null) {
-                stated = Optional.ofNullable(statedVersion.get()).orElse("");
-            }
-            // The library says its version itself; the file name tells it only when the library does not
-            String version = stated.isEmpty() ? fileName.substring(prefix.length(), fileName.length() - ".jar".length()) : stated;
-            if (!fileName.equals(fileName(declared.getName(), version, null))) {
+            String version = fileName.substring(prefix.length(), fileName.length() - ".jar".length());
+            if (version.isEmpty() || !Character.isDigit(version.charAt(0)) && !version.equals(statedVersion.get())) {
                 continue;
             }
             SbomChecks.check(declared.getGroup() != null && !declared.getGroup().isBlank(), "Library " + declared.getName() + " has no group");

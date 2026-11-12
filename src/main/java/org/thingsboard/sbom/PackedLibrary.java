@@ -4,8 +4,8 @@ package org.thingsboard.sbom;
 
 /**
  * A library that the packaging puts into the jar although it is not a Maven dependency of the project,
- * so nothing but this declaration can say what it is. Its file in the jar is {@code <name>-<version>.jar}, where the version is the
- * {@code Implementation-Version} of its manifest, or else what follows the name in the file name.
+ * so nothing but this declaration can say what it is. Its file in the jar is {@code <name>-<version>.jar}, where the version starts with
+ * a digit or is the {@code Implementation-Version} of the manifest of the library.
  */
 public class PackedLibrary {
 
