@@ -74,6 +74,8 @@
         <!-- DECLARED DEPENDENCIES: artifacts this project depends on directly, or the BOMs that manage them -->
         <cyclonedx-core-java.version>13.4.0</cyclonedx-core-java.version>
         <packageurl-java.version>1.5.0</packageurl-java.version>
+        <commons-compress.version>1.28.0</commons-compress.version>
+        <commons-io.version>2.20.0</commons-io.version>
         <jackson.version>2.22.4</jackson.version>
         <junit.version>6.1.3</junit.version>
         <assertj.version>3.27.7</assertj.version>
@@ -106,6 +108,9 @@
 
         <!-- INTEGRATION TESTS: plugins the projects in src/it build with -->
         <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
+        <!-- Used only by the projects in src/it that test the reconcile goal -->
+        <it.spring-boot.version>3.5.15</it.spring-boot.version>
+        <it.jnr-ffi.version>2.2.13</it.jnr-ffi.version>
     </properties>
 
     <dependencyManagement>
@@ -203,6 +208,18 @@
             <groupId>com.github.package-url</groupId>
             <artifactId>packageurl-java</artifactId>
             <version>${packageurl-java.version}</version>
+        </dependency>
+        <!-- Rewrites one entry of a jar and copies every other entry byte for byte -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>${commons-compress.version}</version>
+        </dependency>
+        <!-- The builder of the commons-compress ZipFile is a commons-io type -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${commons-io.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -543,6 +560,8 @@
                     </goals>
                     <filterProperties>
                         <cyclonedx-maven-plugin.version>${cyclonedx-maven-plugin.version}</cyclonedx-maven-plugin.version>
+                        <spring-boot.version>${it.spring-boot.version}</spring-boot.version>
+                        <jnr-ffi.version>${it.jnr-ffi.version}</jnr-ffi.version>
                     </filterProperties>
                     <!-- The image goal runs these stand-ins instead of the tools that need a registry -->
                     <properties>
