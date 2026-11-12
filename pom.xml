@@ -568,6 +568,8 @@
                         <cyclonedx-maven-plugin.version>${cyclonedx-maven-plugin.version}</cyclonedx-maven-plugin.version>
                         <spring-boot.version>${it.spring-boot.version}</spring-boot.version>
                         <jnr-ffi.version>${it.jnr-ffi.version}</jnr-ffi.version>
+                        <maven-compiler-plugin.version>${maven-compiler-plugin.version}</maven-compiler-plugin.version>
+                        <maven-jar-plugin.version>${maven-jar-plugin.version}</maven-jar-plugin.version>
                     </filterProperties>
                     <!-- The image goal runs these stand-ins instead of the tools that need a registry -->
                     <properties>
