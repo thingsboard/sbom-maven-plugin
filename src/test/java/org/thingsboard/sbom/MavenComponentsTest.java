@@ -86,6 +86,22 @@ class MavenComponentsTest {
     }
 
     @Test
+    void aNameThatIsAnSpdxExpressionBecomesTheExpression() {
+        assertThat(expression(license("EPL-2.0 OR BSD-3-Clause", null))).isEqualTo("EPL-2.0 OR BSD-3-Clause");
+        assertThat(expression(license("epl-2.0 or bsd-3-clause", "https://example.org/license"))).isEqualTo("EPL-2.0 OR BSD-3-Clause");
+        assertThat(expression(license("GPL-2.0-only WITH Classpath-exception-2.0", null))).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
+        assertThat(expression(license("(MIT OR Apache-2.0) AND BSD-3-Clause", null))).isEqualTo("(MIT OR Apache-2.0) AND BSD-3-Clause");
+        assertThat(expression(license("(epl-2.0 or BSD-3-Clause)", null))).isEqualTo("(EPL-2.0 OR BSD-3-Clause)");
+    }
+
+    @Test
+    void aNameWithAnOperatorThatIsNotMadeOfSpdxIdentifiersIsNotAnExpression() {
+        for (String name : List.of("MIT OR Example-1.0", "MIT WITH MIT", "Apache OR MIT")) {
+            assertThat(MavenComponents.licenses(List.of(license(name, null))).getItems().get(0).getLicense().getName()).isEqualTo(name);
+        }
+    }
+
+    @Test
     void aLicenseThatSpdxDoesNotKnowKeepsItsNameAndUrl() {
         LicenseChoice licenses = MavenComponents.licenses(List.of(license(" Example License ", " https://example.com/license ")));
 
@@ -117,9 +133,23 @@ class MavenComponentsTest {
     }
 
     @Test
+    void aNameThatIsAnSpdxExpressionStaysANameNextToAnotherLicense() {
+        License expression = license("GPL-2.0-only WITH Classpath-exception-2.0", null);
+
+        for (List<License> licenses : List.of(List.of(license("EPL-2.0", null), expression), List.of(expression, license("EPL-2.0", null)))) {
+            assertThat(MavenComponents.licenses(licenses).getItems()).extracting(item -> item.getLicense().getId() != null ? item.getLicense().getId() : item.getLicense().getName())
+                    .containsExactlyInAnyOrder("EPL-2.0", "GPL-2.0-only WITH Classpath-exception-2.0");
+        }
+    }
+
+    @Test
     void thePurlHasTheTypeAndTheClassifierOfTheArtifact() {
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", null)).isEqualTo("pkg:maven/org.example/a@1.0?type=jar");
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", "linux-x86_64")).isEqualTo("pkg:maven/org.example/a@1.0?classifier=linux-x86_64&type=jar");
+    }
+
+    private static String expression(License license) {
+        return MavenComponents.licenses(List.of(license)).getItems().get(0).getExpression().getValue();
     }
 
     private static List<String> ids(License license) {

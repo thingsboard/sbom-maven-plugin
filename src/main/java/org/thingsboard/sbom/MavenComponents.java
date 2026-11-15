@@ -25,6 +25,7 @@ import org.cyclonedx.model.Hash;
 import org.cyclonedx.model.License;
 import org.cyclonedx.model.LicenseChoice;
 import org.cyclonedx.model.LicenseItem;
+import org.cyclonedx.model.license.Expression;
 import org.cyclonedx.util.LicenseResolver;
 
 import java.net.URI;
@@ -255,12 +256,17 @@ final class MavenComponents {
     }
 
     /**
-     * A license of the pom becomes an SPDX id when its name or else its URL is one that SPDX knows, and keeps its name and URL when not.
+     * A license of the pom becomes an SPDX id when its name or else its URL is one that SPDX knows, an SPDX expression when it is
+     * the only license and its name is one, and keeps its name and URL when not.
      */
     static LicenseChoice licenses(List<org.apache.maven.model.License> pomLicenses) {
         LicenseChoice choice = new LicenseChoice();
         for (org.apache.maven.model.License pomLicense : pomLicenses) {
-            LicenseItem resolved = resolve(pomLicense.getName());
+            // Next to another license an expression would replace it or be replaced, so there the name stays a name
+            LicenseItem resolved = pomLicenses.size() == 1 ? expression(pomLicense.getName()) : null;
+            if (resolved == null) {
+                resolved = resolve(pomLicense.getName());
+            }
             if (resolved == null) {
                 resolved = resolveUrl(pomLicense.getUrl());
             }
@@ -319,6 +325,14 @@ final class MavenComponents {
         }
         return resolved.getItems().stream().filter(item -> item.getLicense() != null).findFirst()
                 .or(() -> resolved.getItems().stream().filter(item -> item.getExpression() != null).findFirst()).orElse(null);
+    }
+
+    /**
+     * @return the SPDX expression that the name of a license is, such as "EPL-2.0 OR BSD-3-Clause", else null
+     */
+    private static LicenseItem expression(String name) {
+        String expression = SpdxExpressions.normalizeCompound(name);
+        return expression == null ? null : LicenseItem.ofExpression(new Expression(expression));
     }
 
     /**

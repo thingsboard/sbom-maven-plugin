@@ -181,6 +181,26 @@ class SbomPackageTest {
     }
 
     @Test
+    void writesTheLicenseOfAComponentAsSpdxSpellsIt() {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile())
+                .purl("pkg:generic/chromium@139.0.7258.5?os=linux").license("bsd-3-clause and mit"));
+
+        JsonNode described = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
+
+        assertThat(component(described, "pkg:generic/chromium@139.0.7258.5?os=linux").path("licenses").path(0).path("expression").asText())
+                .isEqualTo("BSD-3-Clause AND MIT");
+    }
+
+    @Test
+    void failsOnALicenseThatIsNotAnSpdxExpression() {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).license("BSD 3"));
+
+        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled component chromium@139.0.7258.5 has the license 'BSD 3', which is not an SPDX license expression");
+    }
+
+    @Test
     void theSameComponentCanBeDeclaredPerPackageWithDifferentPurls() {
         List<BundledComponent> components = List.of(
                 new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).purl("pkg:generic/chromium@139.0.7258.5?os=linux").packages(List.of("deb")),
