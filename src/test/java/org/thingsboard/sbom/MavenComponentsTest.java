@@ -133,6 +133,16 @@ class MavenComponentsTest {
     }
 
     @Test
+    void aNameThatIsAnSpdxExpressionStaysANameNextToAnotherLicense() {
+        License expression = license("GPL-2.0-only WITH Classpath-exception-2.0", null);
+
+        for (List<License> licenses : List.of(List.of(license("EPL-2.0", null), expression), List.of(expression, license("EPL-2.0", null)))) {
+            assertThat(MavenComponents.licenses(licenses).getItems()).extracting(item -> item.getLicense().getId() != null ? item.getLicense().getId() : item.getLicense().getName())
+                    .containsExactlyInAnyOrder("EPL-2.0", "GPL-2.0-only WITH Classpath-exception-2.0");
+        }
+    }
+
+    @Test
     void thePurlHasTheTypeAndTheClassifierOfTheArtifact() {
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", null)).isEqualTo("pkg:maven/org.example/a@1.0?type=jar");
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", "linux-x86_64")).isEqualTo("pkg:maven/org.example/a@1.0?classifier=linux-x86_64&type=jar");

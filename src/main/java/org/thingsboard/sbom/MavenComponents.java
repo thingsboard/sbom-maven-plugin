@@ -256,12 +256,14 @@ final class MavenComponents {
     }
 
     /**
-     * A license of the pom becomes an SPDX id when its name or else its URL is one that SPDX knows, and keeps its name and URL when not.
+     * A license of the pom becomes an SPDX id when its name or else its URL is one that SPDX knows, an SPDX expression when it is
+     * the only license and its name is one, and keeps its name and URL when not.
      */
     static LicenseChoice licenses(List<org.apache.maven.model.License> pomLicenses) {
         LicenseChoice choice = new LicenseChoice();
         for (org.apache.maven.model.License pomLicense : pomLicenses) {
-            LicenseItem resolved = expression(pomLicense.getName());
+            // Next to another license an expression would replace it or be replaced, so there the name stays a name
+            LicenseItem resolved = pomLicenses.size() == 1 ? expression(pomLicense.getName()) : null;
             if (resolved == null) {
                 resolved = resolve(pomLicense.getName());
             }
