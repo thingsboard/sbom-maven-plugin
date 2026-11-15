@@ -22,6 +22,10 @@ import java.util.zip.ZipFile;
 final class SbomFiles {
 
     private static final List<String> HASH_ALGORITHMS = List.of("SHA-256", "SHA-512");
+    /**
+     * The hashes that an SBOM gives of a library, in the order {@code cyclonedx-maven-plugin} writes them.
+     */
+    static final List<String> LIBRARY_HASH_ALGORITHMS = List.of("MD5", "SHA-1", "SHA-256", "SHA-512", "SHA-384", "SHA3-384", "SHA3-256", "SHA3-512");
     static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private SbomFiles() {}
@@ -55,17 +59,21 @@ final class SbomFiles {
     }
 
     static Map<String, String> hashes(Path file) {
+        return hashes(file, HASH_ALGORITHMS);
+    }
+
+    static Map<String, String> hashes(Path file, List<String> algorithms) {
         try (InputStream in = Files.newInputStream(file)) {
-            return hashes(in, file.toString());
+            return hashes(in, file.toString(), algorithms);
         } catch (IOException e) {
             throw new SbomException("Failed to read " + file, e);
         }
     }
 
-    static Map<String, String> hashes(InputStream in, String source) {
+    static Map<String, String> hashes(InputStream in, String source, List<String> algorithms) {
         Map<String, MessageDigest> digests = new LinkedHashMap<>();
         try {
-            for (String alg : HASH_ALGORITHMS) {
+            for (String alg : algorithms) {
                 digests.put(alg, MessageDigest.getInstance(alg));
             }
         } catch (NoSuchAlgorithmException e) {
@@ -88,13 +96,6 @@ final class SbomFiles {
     }
 
     static JsonNode readResource(Path source, String resource) {
-        if (Files.isDirectory(source)) {
-            Path file = source.resolve(resource);
-            if (!Files.isRegularFile(file)) {
-                throw missingResource(source, resource);
-            }
-            return readFile(file);
-        }
         if (!Files.isRegularFile(source)) {
             throw new SbomException("SBOM source " + source + " does not exist");
         }
@@ -113,7 +114,7 @@ final class SbomFiles {
 
     private static SbomException missingResource(Path source, String resource) {
         return new SbomException(resource + " not found in " + source
-                + ". Rebuild the module that produces it, or skip the SBOM merge");
+                + ". Rebuild the module that produces it, or skip the nested SBOM");
     }
 
 }

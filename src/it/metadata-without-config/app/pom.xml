@@ -14,14 +14,6 @@
         <version>1.0</version>
     </parent>
     <artifactId>app</artifactId>
-    <dependencies>
-        <dependency>
-            <groupId>org.example.it</groupId>
-            <artifactId>ui</artifactId>
-            <version>1.0</version>
-            <scope>runtime</scope>
-        </dependency>
-    </dependencies>
     <build>
         <plugins>
             <plugin>
@@ -49,15 +41,6 @@
                 <artifactId>@project.artifactId@</artifactId>
                 <version>@project.version@</version>
                 <executions>
-                    <execution>
-                        <id>merge</id>
-                        <goals>
-                            <goal>merge</goal>
-                        </goals>
-                        <configuration>
-                            <host>org.example.it:ui</host>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>metadata</id>
                         <goals>

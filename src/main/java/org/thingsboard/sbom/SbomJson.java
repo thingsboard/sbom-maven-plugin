@@ -22,9 +22,16 @@ final class SbomJson {
         ObjectNode bom = JsonNodeFactory.instance.objectNode();
         bom.put("bomFormat", "CycloneDX");
         bom.put("specVersion", specVersion);
-        bom.put("serialNumber", "urn:uuid:" + UUID.nameUUIDFromBytes(serialSeed.getBytes(StandardCharsets.UTF_8)));
+        bom.put("serialNumber", serialNumber(serialSeed));
         bom.put("version", 1);
         return bom;
+    }
+
+    /**
+     * The same for the same seed, so an SBOM that is made again of the same thing keeps its serial number.
+     */
+    static String serialNumber(String seed) {
+        return "urn:uuid:" + UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
     }
 
     static void putDependencies(ObjectNode bom, Map<String, Set<String>> graph) {
