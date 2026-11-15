@@ -88,6 +88,7 @@ The build fails, and no jar is changed, when the jar does not exist or packs no 
         <goal>metadata</goal>
     </goals>
     <configuration>
+        <targetFile>${project.build.directory}/sbom/ui.cdx.json</targetFile>
         <manufacturer>
             <name>ThingsBoard, Inc.</name>
             <urls>
@@ -114,7 +115,7 @@ The build fails, and no jar is changed, when the jar does not exist or packs no 
 
 `timestamp` is a date and time with an offset (`2026-01-31T12:00:00Z`) or seconds since 1970, and is written in UTC. By default it is `project.build.outputTimestamp`, the time Maven builds reproducibly with, so set the property to the time of the release when you set the release version. Without it, or with the `1980-02-01T00:00:00Z` that newer Maven versions set by themselves, the timestamp of the SBOM stays as it is. The `package` goal copies the timestamp of the application SBOM, and the `image` goal that of the first component with an `sbom`.
 
-Each of the first three is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. Also takes `targetFile` (`sbom.metadata.targetFile`, by default `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json`, which is not where the `jar` goal writes: that goal sets the organizations itself) and `skip` (`sbom.metadata.skip`).
+Each of the first three is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. `targetFile` (`sbom.metadata.targetFile`) is the SBOM to update and is required; the `jar` goal sets the organizations of its SBOM itself. Also takes `skip` (`sbom.metadata.skip`).
 
 The build fails, and the file is left untouched, when nothing is configured, the timestamp is not a date and time with an offset, an organization has no name, a url is blank, a contact is empty, the SBOM is older than CycloneDX 1.6, the input or the result fails schema validation, or anything other than these fields would change.
 

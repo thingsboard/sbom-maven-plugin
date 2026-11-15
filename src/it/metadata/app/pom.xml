@@ -47,6 +47,7 @@
                             <goal>metadata</goal>
                         </goals>
                         <configuration>
+                            <targetFile>${project.build.outputDirectory}/META-INF/sbom/application.cdx.json</targetFile>
                             <manufacturer>
                                 <name>Example, Inc.</name>
                                 <urls>
