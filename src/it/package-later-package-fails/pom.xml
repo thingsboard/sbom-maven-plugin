@@ -31,7 +31,7 @@
                 </executions>
                 <configuration>
                     <projectType>application</projectType>
-                    <outputDirectory>${project.build.outputDirectory}/META-INF/sbom</outputDirectory>
+                    <outputDirectory>${project.build.directory}/sbom</outputDirectory>
                     <outputFormat>json</outputFormat>
                     <outputName>application.cdx</outputName>
                     <skipNotDeployed>false</skipNotDeployed>

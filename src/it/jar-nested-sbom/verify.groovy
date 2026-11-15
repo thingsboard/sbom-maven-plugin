@@ -4,7 +4,7 @@ import groovy.json.JsonSlurper
 
 import java.util.zip.ZipFile
 
-def sbomFile = new File(basedir, 'app/target/classes/META-INF/sbom/application.cdx.json')
+def sbomFile = new File(basedir, 'app/target/sbom/application.cdx.json')
 def bom = new JsonSlurper().parse(sbomFile)
 assert bom.components.count { it.purl.startsWith('pkg:npm/') } == 9
 def ui = bom.components.find { it.purl.startsWith('pkg:maven/org.example.it/ui@') }

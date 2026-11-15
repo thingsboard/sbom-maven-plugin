@@ -69,8 +69,9 @@
         <!-- MAVEN API: what the plugin compiles against -->
         <!-- Minimum supported Maven: the oldest version shipped by the last two Ubuntu LTS releases (24.04: 3.8.7, 26.04: 3.9.12). The plugin compiles against it and declares it in <prerequisites>. -->
         <maven-api.version>3.8.7</maven-api.version>
-        <!-- The resolver that Maven ${maven-api.version} brings -->
+        <!-- The resolver and plexus-utils that Maven ${maven-api.version} brings -->
         <maven-resolver.version>1.6.3</maven-resolver.version>
+        <plexus-utils.version>3.3.1</plexus-utils.version>
         <maven-plugin-tools.version>3.16.0</maven-plugin-tools.version>
 
         <!-- DECLARED DEPENDENCIES: artifacts this project depends on directly, or the BOMs that manage them -->
@@ -194,6 +195,13 @@
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-model-builder</artifactId>
             <version>${maven-api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- For Xpp3Dom, the plugin configuration in a pom: a class that every Maven version gives its plugins -->
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>${plexus-utils.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

@@ -51,7 +51,7 @@ The goal runs at `package` by default. Declare the plugin after the plugin that 
 | --- | --- | --- | --- |
 | `jar` | `sbom.jar.jar` | `${project.build.directory}/${project.build.finalName}.jar` | The jar that packs the libraries. The build fails when it packs none |
 | `libraryDirectory` | `sbom.jar.libraryDirectory` | `BOOT-INF/lib` | The directory of the jar that holds the libraries |
-| `sbomFile` | `sbom.jar.sbomFile` | `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json` | Where the SBOM is written |
+| `sbomFile` | `sbom.jar.sbomFile` | `${project.build.directory}/sbom/application.cdx.json` | Where the SBOM is written. Not in the output directory, where a later build without `clean` would pack it |
 | `resource` | `sbom.jar.resource` | `META-INF/sbom/application.cdx.json` | Path of the SBOM inside a jar |
 | `otherJars` | | | Other jars of the project that get the same SBOM. One that does not exist is passed over |
 | `libraries` | | | Libraries that the packaging adds and that are not Maven dependencies of the project: `group` and `name`. The file in the jar is `<name>-<version>.jar`, where the version starts with a digit or is the `Implementation-Version` of the manifest of the library. Its pom comes from the repositories of the project |
@@ -65,8 +65,8 @@ A packed library is a Maven dependency of the project when its file has the name
 
 The SBOM is CycloneDX 1.6 and has what `cyclonedx-maven-plugin` writes, by the same rules:
 
-- A component has the coordinates of the artifact, its purl with type and classifier, eight hashes of the file, and from the effective pom of the artifact its description, publisher, licenses and links (website, version control, issue tracker, mailing list, build system, distribution). A license is an SPDX id when its name or else its URL is one that SPDX knows, and keeps its name and URL when not.
-- The dependency graph is the one Maven resolves, without the test dependencies. A dependency that lost a version conflict is an edge to the version that won. What depended on an artifact that is not packed, such as a starter, depends on what that artifact depended on. A packed library that the graph does not have is a dependency of the project: one declared in `libraries`, or one that Maven's graph reaches only through test dependencies.
+- A component has the coordinates of the artifact, its purl with type and classifier, eight hashes of the file, and from the effective pom of the artifact its description, publisher, licenses and links (website, version control, issue tracker, mailing list, build system, distribution). A license is an SPDX id when its name or else its URL is one that SPDX knows, and keeps its name and URL when not. A component has the type that the pom of its artifact gives `cyclonedx-maven-plugin` as `projectType`, and is a `library` otherwise.
+- The dependency graph is the one Maven resolves, without the test dependencies. A dependency that lost a version conflict is an edge to the version that won. What depended on an artifact that is not packed, such as a starter, depends on what that artifact depended on. Maven's graph can lack a packed dependency, when the version that won a conflict sits under a test dependency. Such a library takes its place from the poms: it depends on the packed libraries that its pom names, and the packed libraries whose pom names it depend on it. A library that nothing depends on, such as one declared in `libraries` or one that no pom names, is a dependency of the project, so every library is reached from it.
 - The metadata has the component of the project, described by its pom, this plugin as the tool, the lifecycle phase `build`, the properties `maven.goal` and, for a build with a fixed time, `cdx:reproducible`, and a serial number that is the same for the same project and properties.
 
 A nested SBOM is folded in as follows:
@@ -88,6 +88,7 @@ The build fails, and no jar is changed, when the jar does not exist or packs no 
         <goal>metadata</goal>
     </goals>
     <configuration>
+        <targetFile>${project.build.directory}/sbom/ui.cdx.json</targetFile>
         <manufacturer>
             <name>ThingsBoard, Inc.</name>
             <urls>
@@ -114,7 +115,7 @@ The build fails, and no jar is changed, when the jar does not exist or packs no 
 
 `timestamp` is a date and time with an offset (`2026-01-31T12:00:00Z`) or seconds since 1970, and is written in UTC. By default it is `project.build.outputTimestamp`, the time Maven builds reproducibly with, so set the property to the time of the release when you set the release version. Without it, or with the `1980-02-01T00:00:00Z` that newer Maven versions set by themselves, the timestamp of the SBOM stays as it is. The `package` goal copies the timestamp of the application SBOM, and the `image` goal that of the first component with an `sbom`.
 
-Each of the first three is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. Also takes `targetFile` (`sbom.metadata.targetFile`) and `skip` (`sbom.metadata.skip`).
+Each of the first three is an organization with a `name`, optional `urls` and optional `contacts` (`name`, `email`, `phone`). Configured fields replace existing values; fields that are not configured are left as they are. `targetFile` (`sbom.metadata.targetFile`) is the SBOM to update and is required; the `jar` goal sets the organizations of its SBOM itself. Also takes `skip` (`sbom.metadata.skip`).
 
 The build fails, and the file is left untouched, when nothing is configured, the timestamp is not a date and time with an offset, an organization has no name, a url is blank, a contact is empty, the SBOM is older than CycloneDX 1.6, the input or the result fails schema validation, or anything other than these fields would change.
 
@@ -177,7 +178,7 @@ The `package` goal runs at `package` by default. Declare the plugin after the pl
 | `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (SPDX expression), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
 | `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component |
 | `version` | `sbom.package.version` | `${project.version}` | Version of the package component |
-| `sourceFile` | `sbom.package.sourceFile` | `${project.build.outputDirectory}/META-INF/sbom/application.cdx.json` | Application SBOM to start from |
+| `sourceFile` | `sbom.package.sourceFile` | `${project.build.directory}/sbom/application.cdx.json` | Application SBOM to start from: by default the one the `jar` goal writes |
 | `skip` | `sbom.package.skip` | `false` | Skip all packages |
 
 The build fails, and no package SBOM is written, when package ids repeat, a package has no purl or an invalid one, a package file is missing or empty, a bundled component has no name, is declared twice, has an `sbom` together with details of its own or without a `file`, sets `installDir` or `bundleDir`, still contains an unresolved `${...}` property, has a supplier without name or with a blank url, has an `sbom` that is invalid, uses another spec version, has components its root does not depend on, or does not match the file's hashes, refers to an unknown package id, points to a missing file or an empty directory, or clashes with a component already in the SBOM, a `cryptographic-asset` is not an X.509 certificate, a `cpe` does not start with `cpe:2.3:` or `cpe:/`, or the result fails schema validation or loses a dependency path of the application.

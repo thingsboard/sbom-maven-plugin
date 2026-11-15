@@ -21,7 +21,7 @@ public class MetadataMojo extends SbomMojo {
     /**
      * SBOM to update, rewritten in place.
      */
-    @Parameter(property = "sbom.metadata.targetFile", defaultValue = "${project.build.outputDirectory}/META-INF/sbom/application.cdx.json", required = true)
+    @Parameter(property = "sbom.metadata.targetFile", required = true)
     private File targetFile;
 
     /**

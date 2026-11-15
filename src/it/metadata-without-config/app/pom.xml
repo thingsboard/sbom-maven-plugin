@@ -46,6 +46,9 @@
                         <goals>
                             <goal>metadata</goal>
                         </goals>
+                        <configuration>
+                            <targetFile>${project.build.outputDirectory}/META-INF/sbom/application.cdx.json</targetFile>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

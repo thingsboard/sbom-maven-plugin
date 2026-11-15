@@ -23,7 +23,7 @@ public class PackageMojo extends SbomMojo {
     /**
      * Application SBOM to start from.
      */
-    @Parameter(property = "sbom.package.sourceFile", defaultValue = "${project.build.outputDirectory}/META-INF/sbom/application.cdx.json", required = true)
+    @Parameter(property = "sbom.package.sourceFile", defaultValue = "${project.build.directory}/sbom/application.cdx.json", required = true)
     private File sourceFile;
 
     /**

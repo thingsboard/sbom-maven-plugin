@@ -24,6 +24,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -73,9 +74,10 @@ public class JarMojo extends SbomMojo {
     private String libraryDirectory;
 
     /**
-     * Where the SBOM is written.
+     * Where the SBOM is written. Not in the output directory of the project, where a later build without {@code clean}
+     * would pack the SBOM of this one.
      */
-    @Parameter(property = "sbom.jar.sbomFile", defaultValue = "${project.build.outputDirectory}/META-INF/sbom/application.cdx.json", required = true)
+    @Parameter(property = "sbom.jar.sbomFile", defaultValue = "${project.build.directory}/sbom/application.cdx.json", required = true)
     private File sbomFile;
 
     /**
@@ -160,8 +162,8 @@ public class JarMojo extends SbomMojo {
         SbomChecks.check(!packed.isEmpty(), "Jar " + jarPath + " packs no libraries in " + libraryDirectory
                 + ". Set the jar parameter to the jar that packs them");
 
-        MavenComponents maven = new MavenComponents(session, project, projectBuilder, artifactHandlerManager);
-        Map<String, Artifact> artifacts = artifactsByFileName();
+        MavenComponents maven = new MavenComponents(session, project, projectBuilder, artifactHandlerManager, getLog()::warn);
+        Map<String, Artifact> artifacts = artifactsByFileName(project.getArtifacts());
         List<Component> components = new ArrayList<>();
         Set<String> dependencies = new LinkedHashSet<>();
         List<String> unknown = new ArrayList<>();
@@ -183,9 +185,10 @@ public class JarMojo extends SbomMojo {
 
         String time = SbomMetadata.timestamp(timestamp);
         Map<String, Set<String>> graph = MavenGraph.collect(session, project, repositorySystem);
-        // Maven's graph can lose the edge to a dependency when the version that won a conflict sits under a test dependency
-        dependencies.stream().filter(ref -> !graph.containsKey(ref))
-                .forEach(ref -> getLog().info("Nothing but test dependencies leads to " + ref + " in the dependency graph, so the SBOM makes it a dependency of the project"));
+        dependencies.removeAll(graph.keySet());
+        dependencies.forEach(ref -> getLog().info("Maven's dependency graph does not have " + ref + ": its place in the SBOM is what the poms of the libraries say"));
+        JarSbom.linkByPoms(graph, dependencies, maven.poms())
+                .forEach(ref -> getLog().warn("No pom of a packed library names " + ref + ", so the SBOM makes it a dependency of the project"));
         ObjectNode bom = JarSbom.bom(maven.root(project, projectType), MavenComponents.tool(plugin), components, graph, time != null);
         for (NestedSbom nested : nestedSboms) {
             if (!nested.isSkip()) {
@@ -211,10 +214,10 @@ public class JarMojo extends SbomMojo {
      * The dependencies of the project whose file is a jar, by the name Spring Boot gives the file when it packs it:
      * the name Maven gives it, after the group when two dependencies have that name.
      */
-    private Map<String, Artifact> artifactsByFileName() {
+    static Map<String, Artifact> artifactsByFileName(Collection<Artifact> dependencies) {
         Map<String, Artifact> byName = new HashMap<>();
         Map<String, Artifact> afterGroup = new HashMap<>();
-        for (Artifact artifact : project.getArtifacts()) {
+        for (Artifact artifact : dependencies) {
             if (artifact.getFile() == null || !artifact.getFile().isFile() || !"jar".equals(artifact.getArtifactHandler().getExtension())) {
                 continue;
             }
@@ -228,9 +231,13 @@ public class JarMojo extends SbomMojo {
     }
 
     private static Component dependency(MavenComponents maven, Artifact artifact, Library library) {
-        SbomChecks.check(library.sha256().equals(SbomFiles.hashes(artifact.getFile().toPath(), List.of("SHA-256")).get("SHA-256")),
-                "The jar packs " + library.fileName() + " with other content than the file Maven resolved: " + artifact.getFile());
+        checkSameContent(artifact.getFile().toPath(), library);
         return maven.library(artifact);
+    }
+
+    static void checkSameContent(Path resolved, Library library) {
+        SbomChecks.check(library.sha256().equals(SbomFiles.hashes(resolved, List.of("SHA-256")).get("SHA-256")),
+                "The jar packs " + library.fileName() + " with other content than the file Maven resolved: " + resolved);
     }
 
     private Component declared(MavenComponents maven, Path jarPath, Library library) {

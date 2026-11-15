@@ -2,11 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.model.License;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.cyclonedx.model.Component;
 import org.cyclonedx.model.LicenseChoice;
 import org.cyclonedx.model.LicenseItem;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,8 +39,50 @@ class MavenComponentsTest {
     void theOldAddressOfAnOpenSourceInitiativePageStandsForTheSameLicense() {
         assertThat(ids(license("BSD New license", "http://opensource.org/licenses/BSD-3-Clause"))).containsExactly("BSD-3-Clause");
         assertThat(ids(license("BSD 3", "https://www.opensource.org/licenses/bsd-3-clause.php"))).containsExactly("BSD-3-Clause");
-        assertThat(ids(license("An LGPL license", "https://www.opensource.org/licenses/LGPL-2.1"))).containsExactly("LGPL-2.1-or-later");
+        // The address names a version and nothing later
+        assertThat(ids(license("An LGPL license", "https://www.opensource.org/licenses/LGPL-2.1"))).containsExactly("LGPL-2.1-only");
+        assertThat(ids(license("A GPL license", "http://www.opensource.org/licenses/gpl-2.0.php"))).containsExactly("GPL-2.0-only");
         assertThat(ids(license("Example License", "https://opensource.org/licenses/unknown"))).containsExactly((String) null);
+    }
+
+    @Test
+    void aPageOfTheOpenSourceInitiativeStandsForTheVersionItNamesAndNoLaterOne() {
+        assertThat(ids(license("A GPL license", "https://opensource.org/license/gpl-2.0"))).containsExactly("GPL-2.0-only");
+        assertThat(ids(license("An LGPL license", "https://opensource.org/license/lgpl-2.1"))).containsExactly("LGPL-2.1-only");
+        assertThat(ids(license("An AGPL license", "https://opensource.org/license/agpl-3.0"))).containsExactly("AGPL-3.0-only");
+        assertThat(ids(license("An MIT license", "https://opensource.org/license/mit"))).containsExactly("MIT");
+    }
+
+    @Test
+    void aPomNamesWhatMavenFollowsWithTheClassifierOfItsType() {
+        Dependency optional = dependency("optional", null, null, null);
+        optional.setOptional(true);
+
+        MavenComponents.Pom pom = MavenComponents.pom("org.example:a::jar", List.of(
+                dependency("b", null, null, null), dependency("c", "runtime", "native", "jar"), dependency("d", null, null, "test-jar"),
+                dependency("tested", "test", null, null), dependency("provided", "provided", null, null), optional), type -> "test-jar".equals(type) ? "tests" : null);
+
+        assertThat(pom.coordinates()).isEqualTo("org.example:a::jar");
+        assertThat(pom.dependsOn()).containsExactlyInAnyOrder("org.example:b::jar", "org.example:c:native:jar", "org.example:d:tests:test-jar");
+    }
+
+    @Test
+    void aLibraryIsOfTheTypeItsPomStatesForCycloneDx() {
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(MavenComponents.libraryType(project(null), "pkg:a", warnings::add)).isEqualTo(Component.Type.LIBRARY);
+        assertThat(MavenComponents.libraryType(project(new Xpp3Dom("configuration")), "pkg:a", warnings::add)).isEqualTo(Component.Type.LIBRARY);
+        assertThat(MavenComponents.libraryType(project(projectType("Framework")), "pkg:a", warnings::add)).isEqualTo(Component.Type.FRAMEWORK);
+        assertThat(warnings).isEmpty();
+    }
+
+    @Test
+    void aLibraryWhosePomStatesNoCycloneDxTypeIsALibrary() {
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(MavenComponents.libraryType(project(projectType("${type}")), "pkg:a", warnings::add)).isEqualTo(Component.Type.LIBRARY);
+        assertThat(MavenComponents.libraryType(project(projectType(null)), "pkg:b", warnings::add)).isEqualTo(Component.Type.LIBRARY);
+        assertThat(warnings).hasSize(2).first().asString().contains("pkg:a", "${type}");
     }
 
     @Test
@@ -54,6 +104,19 @@ class MavenComponentsTest {
     }
 
     @Test
+    void anExpressionAndALicenseAreNotListedTogetherAndTheLaterOneStays() {
+        License expression = license("CDDL + GPLv2 with classpath exception", null);
+
+        LicenseChoice licenseLast = MavenComponents.licenses(List.of(expression, license("MIT", null)));
+        LicenseChoice expressionLast = MavenComponents.licenses(List.of(license("MIT", null), expression));
+
+        assertThat(licenseLast.getItems()).hasSize(1);
+        assertThat(licenseLast.getItems().get(0).getLicense().getId()).isEqualTo("MIT");
+        assertThat(expressionLast.getItems()).hasSize(1);
+        assertThat(expressionLast.getItems().get(0).getExpression()).isNotNull();
+    }
+
+    @Test
     void thePurlHasTheTypeAndTheClassifierOfTheArtifact() {
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", null)).isEqualTo("pkg:maven/org.example/a@1.0?type=jar");
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", "linux-x86_64")).isEqualTo("pkg:maven/org.example/a@1.0?classifier=linux-x86_64&type=jar");
@@ -61,6 +124,42 @@ class MavenComponentsTest {
 
     private static List<String> ids(License license) {
         return MavenComponents.licenses(List.of(license)).getItems().stream().map(item -> item.getLicense().getId()).toList();
+    }
+
+    private static Dependency dependency(String name, String scope, String classifier, String type) {
+        Dependency dependency = new Dependency();
+        dependency.setGroupId("org.example");
+        dependency.setArtifactId(name);
+        dependency.setScope(scope);
+        dependency.setClassifier(classifier);
+        if (type != null) {
+            dependency.setType(type);
+        }
+        return dependency;
+    }
+
+    private static Xpp3Dom projectType(String value) {
+        Xpp3Dom type = new Xpp3Dom("projectType");
+        type.setValue(value);
+        Xpp3Dom configuration = new Xpp3Dom("configuration");
+        configuration.addChild(type);
+        return configuration;
+    }
+
+    /**
+     * A project with the CycloneDX plugin when it has a configuration, else without.
+     */
+    private static MavenProject project(Xpp3Dom configuration) {
+        Model model = new Model();
+        model.setBuild(new Build());
+        if (configuration != null) {
+            Plugin plugin = new Plugin();
+            plugin.setGroupId("org.cyclonedx");
+            plugin.setArtifactId("cyclonedx-maven-plugin");
+            plugin.setConfiguration(configuration);
+            model.getBuild().addPlugin(plugin);
+        }
+        return new MavenProject(model);
     }
 
     private static License license(String name, String url) {

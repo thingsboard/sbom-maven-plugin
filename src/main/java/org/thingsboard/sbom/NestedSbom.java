@@ -13,6 +13,11 @@ public class NestedSbom {
 
     public NestedSbom() {}
 
+    NestedSbom(String library, String resource) {
+        this.library = library;
+        this.resource = resource;
+    }
+
     /**
      * {@code groupId:artifactId} of the library.
      */
