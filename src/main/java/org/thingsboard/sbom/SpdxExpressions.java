@@ -5,10 +5,9 @@ package org.thingsboard.sbom;
 import org.spdx.library.LicenseInfoFactory;
 import org.spdx.library.ListedLicenses;
 import org.spdx.library.SpdxModelFactory;
-import org.spdx.library.model.v3_0_1.expandedlicensing.ConjunctiveLicenseSet;
-import org.spdx.library.model.v3_0_1.expandedlicensing.DisjunctiveLicenseSet;
-import org.spdx.library.model.v3_0_1.expandedlicensing.OrLaterOperator;
-import org.spdx.library.model.v3_0_1.expandedlicensing.WithAdditionOperator;
+import org.spdx.library.model.v3_0_1.expandedlicensing.NoAssertionLicense;
+import org.spdx.library.model.v3_0_1.expandedlicensing.NoneLicense;
+import org.spdx.library.model.v3_0_1.simplelicensing.InvalidLicenseExpression;
 
 import java.util.Locale;
 import java.util.Map;
@@ -18,9 +17,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Recognizes an SPDX license expression: license identifiers joined with {@code AND}, {@code OR} and {@code WITH},
- * as in {@code EPL-2.0 OR BSD-3-Clause}. A pom can give one as the name of its license. The SPDX Java library decides
- * what is an expression.
+ * Recognizes an SPDX license expression: one license identifier, or several joined with {@code AND}, {@code OR} and
+ * {@code WITH}, as in {@code EPL-2.0 OR BSD-3-Clause}. The SPDX Java library decides what is an expression.
  */
 final class SpdxExpressions {
     private static final Pattern TOKEN = Pattern.compile("[()]|[^\\s()]+");
@@ -38,10 +36,22 @@ final class SpdxExpressions {
 
     /**
      * @return the expression with its operators in capitals and its identifiers as SPDX spells them, or null when
-     *         the text is not an expression of more than one identifier
+     *         the text is not an SPDX license expression
      */
     static String normalize(String text) {
         return text == null ? null : NORMALIZED.computeIfAbsent(text.trim(), expression -> Optional.ofNullable(parse(expression))).orElse(null);
+    }
+
+    /**
+     * A pom can give an expression as the name of its license. One identifier alone is not taken for one here: a name
+     * that is an identifier is a license.
+     *
+     * @return the expression as {@link #normalize} gives it, or null when the text is not an expression of more than
+     *         one identifier
+     */
+    static String normalizeCompound(String text) {
+        String normalized = normalize(text);
+        return normalized != null && TOKEN.matcher(normalized).results().count() > 1 ? normalized : null;
     }
 
     // The library keeps what it parses in one store, so one expression is parsed at a time
@@ -52,9 +62,8 @@ final class SpdxExpressions {
         } catch (Exception e) {
             return null;
         }
-        // One license, and a text that is no expression, are other types
-        if (!(parsed instanceof ConjunctiveLicenseSet || parsed instanceof DisjunctiveLicenseSet || parsed instanceof WithAdditionOperator
-                || parsed instanceof OrLaterOperator)) {
+        // A text that is no expression is parsed too, as one of these
+        if (parsed instanceof InvalidLicenseExpression || parsed instanceof NoneLicense || parsed instanceof NoAssertionLicense) {
             return null;
         }
         // The library writes the licenses of a parsed expression in an order of its own: the text keeps its order

@@ -162,7 +162,12 @@ final class BundledComponents {
                 json.set("hashes", hashesJson(SbomFiles.hashes(file)));
             }
         }
-        SbomJson.putLicense(json, component.getLicense());
+        if (component.getLicense() != null && !component.getLicense().isBlank()) {
+            String license = SpdxExpressions.normalize(component.getLicense());
+            check(license != null, "Bundled component " + component.ref() + " has the license '" + component.getLicense()
+                    + "', which is not an SPDX license expression");
+            SbomJson.putLicense(json, license);
+        }
         if (component.getPurl() != null && !component.getPurl().isBlank()) {
             SbomChecks.checkPurl("Bundled component " + component.getName(), component.getPurl());
             json.put("purl", component.getPurl());

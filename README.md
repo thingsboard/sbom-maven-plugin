@@ -175,7 +175,7 @@ The `package` goal runs at `package` by default. Declare the plugin after the pl
 | Parameter | Property | Default | Description |
 | --- | --- | --- | --- |
 | `packages` | | required | Packages to describe: `id`, `file`, `purl`, optional `skip` |
-| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (SPDX expression), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
+| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (an SPDX license expression such as `MIT` or `EPL-2.0 OR BSD-3-Clause`; the build fails on anything else), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
 | `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component |
 | `version` | `sbom.package.version` | `${project.version}` | Version of the package component |
 | `sourceFile` | `sbom.package.sourceFile` | `${project.build.directory}/sbom/application.cdx.json` | Application SBOM to start from: by default the one the `jar` goal writes |

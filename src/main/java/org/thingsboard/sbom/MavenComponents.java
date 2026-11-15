@@ -329,7 +329,7 @@ final class MavenComponents {
      * @return the SPDX expression that the name of a license is, such as "EPL-2.0 OR BSD-3-Clause", else null
      */
     private static LicenseItem expression(String name) {
-        String expression = SpdxExpressions.normalize(name);
+        String expression = SpdxExpressions.normalizeCompound(name);
         return expression == null ? null : LicenseItem.ofExpression(new Expression(expression));
     }
 

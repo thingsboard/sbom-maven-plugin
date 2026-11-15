@@ -9,40 +9,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SpdxExpressionsTest {
     @Test
     void identifiersJoinedWithOperatorsAreAnExpression() {
-        assertThat(normalize("EPL-2.0 OR BSD-3-Clause")).isEqualTo("EPL-2.0 OR BSD-3-Clause");
-        assertThat(normalize("  epl-2.0 or  bsd-3-clause and mit ")).isEqualTo("EPL-2.0 OR BSD-3-Clause AND MIT");
-        assertThat(normalize("GPL-2.0-only WITH Classpath-exception-2.0")).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
-        assertThat(normalize("(MIT OR EPL-2.0+) AND (GPL-2.0-only with classpath-exception-2.0)"))
+        assertThat(SpdxExpressions.normalize("EPL-2.0 OR BSD-3-Clause")).isEqualTo("EPL-2.0 OR BSD-3-Clause");
+        assertThat(SpdxExpressions.normalize("  epl-2.0 or  bsd-3-clause and mit ")).isEqualTo("EPL-2.0 OR BSD-3-Clause AND MIT");
+        assertThat(SpdxExpressions.normalize("GPL-2.0-only WITH Classpath-exception-2.0")).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
+        assertThat(SpdxExpressions.normalize("(MIT OR EPL-2.0+) AND (GPL-2.0-only with classpath-exception-2.0)"))
                 .isEqualTo("(MIT OR EPL-2.0+) AND (GPL-2.0-only WITH Classpath-exception-2.0)");
     }
 
     @Test
-    void oneIdentifierIsNotAnExpression() {
-        assertThat(normalize("MIT")).isNull();
-        assertThat(normalize("(MIT)")).isNull();
-        assertThat(normalize("NONE")).isNull();
-        assertThat(normalize("NOASSERTION")).isNull();
+    void oneIdentifierIsAnExpressionButNotACompoundOne() {
+        assertThat(SpdxExpressions.normalize("mit")).isEqualTo("MIT");
+        assertThat(SpdxExpressions.normalize("EPL-2.0+")).isEqualTo("EPL-2.0+");
+        assertThat(SpdxExpressions.normalizeCompound("MIT")).isNull();
+        assertThat(SpdxExpressions.normalizeCompound("MIT OR EPL-2.0")).isEqualTo("MIT OR EPL-2.0");
+        assertThat(SpdxExpressions.normalizeCompound("GPL-2.0-only WITH Classpath-exception-2.0")).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
     }
 
     @Test
     void textThatIsNotMadeOfIdentifiersAndOperatorsIsNotAnExpression() {
-        assertThat(normalize(null)).isNull();
-        assertThat(normalize("")).isNull();
-        assertThat(normalize("MIT OR Unknown-1.0")).isNull();
-        assertThat(normalize("MIT License OR EPL-2.0")).isNull();
-        assertThat(normalize("MIT OR")).isNull();
-        assertThat(normalize("OR MIT")).isNull();
-        assertThat(normalize("MIT EPL-2.0")).isNull();
-        assertThat(normalize("(MIT OR EPL-2.0")).isNull();
-        assertThat(normalize("MIT OR EPL-2.0)")).isNull();
-        assertThat(normalize("MIT WITH")).isNull();
-        assertThat(normalize("MIT WITH EPL-2.0")).isNull();
-        assertThat(normalize("Classpath-exception-2.0 OR MIT")).isNull();
-        assertThat(normalize("MIT, EPL-2.0")).isNull();
-        assertThat(normalize("MIT / EPL-2.0")).isNull();
-    }
-
-    private static String normalize(String text) {
-        return SpdxExpressions.normalize(text);
+        for (String text : new String[] {"", "Apache2", "MIT License", "NONE", "NOASSERTION", "MIT OR Unknown-1.0", "MIT License OR EPL-2.0", "MIT OR", "OR MIT",
+                "MIT EPL-2.0", "(MIT OR EPL-2.0", "MIT OR EPL-2.0)", "MIT WITH", "MIT WITH EPL-2.0", "Classpath-exception-2.0 OR MIT", "MIT, EPL-2.0", "MIT / EPL-2.0"}) {
+            assertThat(SpdxExpressions.normalize(text)).as(text).isNull();
+            assertThat(SpdxExpressions.normalizeCompound(text)).as(text).isNull();
+        }
+        assertThat(SpdxExpressions.normalize(null)).isNull();
     }
 }
