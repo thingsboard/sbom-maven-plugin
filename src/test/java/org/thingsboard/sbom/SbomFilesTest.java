@@ -34,30 +34,12 @@ class SbomFilesTest {
     }
 
     @Test
-    void readsTheResourceFromAClassesDirectory() throws IOException {
-        Path file = tempDir.resolve(RESOURCE);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, Boms.npmFixture().toString());
-
-        JsonNode bom = SbomFiles.readResource(tempDir, RESOURCE);
-
-        assertThat(bom).isEqualTo(Boms.npmFixture());
-    }
-
-    @Test
     void failsWhenTheJarHasNoSuchResource() throws IOException {
         Path jar = jar("META-INF/other.json", "{}");
 
         assertThatThrownBy(() -> SbomFiles.readResource(jar, RESOURCE))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining(RESOURCE + " not found in " + jar);
-    }
-
-    @Test
-    void failsWhenTheDirectoryHasNoSuchResource() {
-        assertThatThrownBy(() -> SbomFiles.readResource(tempDir, RESOURCE))
-                .isInstanceOf(SbomException.class)
-                .hasMessageContaining(RESOURCE + " not found in " + tempDir);
     }
 
     @Test

@@ -26,6 +26,7 @@ class JarLibrariesTest {
 
         assertThat(JarLibraries.read(jar, "BOOT-INF/lib")).extracting(JarLibraries.Library::fileName).containsExactly("plain-1.0.jar", "tools-3.5.8.jar");
         assertThat(JarLibraries.read(jar, "BOOT-INF/lib").get(0).sha256()).hasSize(64);
+        assertThat(JarLibraries.read(jar, "BOOT-INF/lib").get(0).hashes()).containsOnlyKeys(SbomFiles.LIBRARY_HASH_ALGORITHMS);
     }
 
     @Test

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -15,13 +14,6 @@ import java.util.Set;
 public final class SbomMerger {
 
     private SbomMerger() {}
-
-    public static int mergeFile(Path targetFile, Path source, String nestedResource, String hostPurlPrefix) {
-        JsonNode target = SbomFiles.readFile(targetFile);
-        JsonNode nested = SbomFiles.readResource(source, nestedResource);
-        SbomFiles.writeFile(targetFile, merge(target, nested, hostPurlPrefix));
-        return nested.path("components").size();
-    }
 
     public static ObjectNode merge(JsonNode target, JsonNode nested, String hostPurlPrefix) {
         SbomChecks.checkInput("Target", target);
