@@ -25,6 +25,7 @@ import org.cyclonedx.model.Hash;
 import org.cyclonedx.model.License;
 import org.cyclonedx.model.LicenseChoice;
 import org.cyclonedx.model.LicenseItem;
+import org.cyclonedx.model.license.Expression;
 import org.cyclonedx.util.LicenseResolver;
 
 import java.net.URI;
@@ -262,6 +263,9 @@ final class MavenComponents {
         for (org.apache.maven.model.License pomLicense : pomLicenses) {
             LicenseItem resolved = resolve(pomLicense.getName());
             if (resolved == null) {
+                resolved = expression(pomLicense.getName());
+            }
+            if (resolved == null) {
                 resolved = resolveUrl(pomLicense.getUrl());
             }
             if (resolved == null && pomLicense.getName() != null) {
@@ -319,6 +323,14 @@ final class MavenComponents {
         }
         return resolved.getItems().stream().filter(item -> item.getLicense() != null).findFirst()
                 .or(() -> resolved.getItems().stream().filter(item -> item.getExpression() != null).findFirst()).orElse(null);
+    }
+
+    /**
+     * @return the SPDX expression that the name of a license is, such as "EPL-2.0 OR BSD-3-Clause", else null
+     */
+    private static LicenseItem expression(String name) {
+        String expression = SpdxExpressions.normalize(name);
+        return expression == null ? null : LicenseItem.ofExpression(new Expression(expression));
     }
 
     /**

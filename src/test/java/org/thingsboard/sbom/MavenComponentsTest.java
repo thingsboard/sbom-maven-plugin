@@ -86,6 +86,21 @@ class MavenComponentsTest {
     }
 
     @Test
+    void aNameThatIsAnSpdxExpressionBecomesTheExpression() {
+        assertThat(expression(license("EPL-2.0 OR BSD-3-Clause", null))).isEqualTo("EPL-2.0 OR BSD-3-Clause");
+        assertThat(expression(license("epl-2.0 or bsd-3-clause", "https://example.org/license"))).isEqualTo("EPL-2.0 OR BSD-3-Clause");
+        assertThat(expression(license("GPL-2.0-only WITH Classpath-exception-2.0", null))).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
+        assertThat(expression(license("(MIT OR Apache-2.0) AND BSD-3-Clause", null))).isEqualTo("(MIT OR Apache-2.0) AND BSD-3-Clause");
+    }
+
+    @Test
+    void aNameWithAnOperatorThatIsNotMadeOfSpdxIdentifiersIsNotAnExpression() {
+        assertThat(MavenComponents.licenses(List.of(license("MIT OR Example-1.0", null))).getItems().get(0).getLicense().getName()).isEqualTo("MIT OR Example-1.0");
+        assertThat(MavenComponents.licenses(List.of(license("MIT WITH MIT", null))).getItems().get(0).getLicense().getName()).isEqualTo("MIT WITH MIT");
+        assertThat(MavenComponents.licenses(List.of(license("Apache OR MIT", null))).getItems().get(0).getLicense().getName()).isEqualTo("Apache OR MIT");
+    }
+
+    @Test
     void aLicenseThatSpdxDoesNotKnowKeepsItsNameAndUrl() {
         LicenseChoice licenses = MavenComponents.licenses(List.of(license(" Example License ", " https://example.com/license ")));
 
@@ -120,6 +135,10 @@ class MavenComponentsTest {
     void thePurlHasTheTypeAndTheClassifierOfTheArtifact() {
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", null)).isEqualTo("pkg:maven/org.example/a@1.0?type=jar");
         assertThat(MavenComponents.purl("org.example", "a", "1.0", "jar", "linux-x86_64")).isEqualTo("pkg:maven/org.example/a@1.0?classifier=linux-x86_64&type=jar");
+    }
+
+    private static String expression(License license) {
+        return MavenComponents.licenses(List.of(license)).getItems().get(0).getExpression().getValue();
     }
 
     private static List<String> ids(License license) {

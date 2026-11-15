@@ -76,6 +76,9 @@
 
         <!-- DECLARED DEPENDENCIES: artifacts this project depends on directly, or the BOMs that manage them -->
         <cyclonedx-core-java.version>13.4.0</cyclonedx-core-java.version>
+        <java-spdx-library.version>2.0.5</java-spdx-library.version>
+        <!-- The model that java-spdx-library ${java-spdx-library.version} brings -->
+        <spdx-java-model.version>1.0.5</spdx-java-model.version>
         <packageurl-java.version>1.5.0</packageurl-java.version>
         <commons-compress.version>1.28.0</commons-compress.version>
         <commons-io.version>2.20.0</commons-io.version>
@@ -86,7 +89,7 @@
         <slf4j.version>2.0.20</slf4j.version>
 
         <!-- CONFLICT PINS: never declared, managed only to force one version where the graph disagrees (reasons in dependencyManagement) -->
-        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
 
         <!-- BUILD PLUGINS -->
         <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
@@ -157,7 +160,7 @@
             </dependency>
 
             <!-- CONFLICT PINS: never declared, managed only to force one version where the graph disagrees -->
-            <!-- maven-core < 3.9.8 (provided, so also on the test classpath) brings an old commons-lang3 that would shadow the one Testcontainers needs; remove once maven-api.version >= 3.9.8 -->
+            <!-- maven-core < 3.9.8 (provided, so also on the test classpath) brings an old commons-lang3 that would shadow the one Testcontainers and java-spdx-library need; remove once maven-api.version >= 3.9.8 -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
@@ -231,6 +234,29 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.spdx</groupId>
+            <artifactId>java-spdx-library</artifactId>
+            <version>${java-spdx-library.version}</version>
+            <exclusions>
+                <!-- Maven provides SLF4J to plugins and never loads a plugin's own copy -->
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.spdx</groupId>
+            <artifactId>spdx-java-model-3_0</artifactId>
+            <version>${spdx-java-model.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.cyclonedx</groupId>
