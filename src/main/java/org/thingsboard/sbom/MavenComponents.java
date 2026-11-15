@@ -261,9 +261,9 @@ final class MavenComponents {
     static LicenseChoice licenses(List<org.apache.maven.model.License> pomLicenses) {
         LicenseChoice choice = new LicenseChoice();
         for (org.apache.maven.model.License pomLicense : pomLicenses) {
-            LicenseItem resolved = resolve(pomLicense.getName());
+            LicenseItem resolved = expression(pomLicense.getName());
             if (resolved == null) {
-                resolved = expression(pomLicense.getName());
+                resolved = resolve(pomLicense.getName());
             }
             if (resolved == null) {
                 resolved = resolveUrl(pomLicense.getUrl());

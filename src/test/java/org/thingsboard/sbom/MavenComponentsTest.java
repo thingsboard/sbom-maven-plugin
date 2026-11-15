@@ -91,13 +91,14 @@ class MavenComponentsTest {
         assertThat(expression(license("epl-2.0 or bsd-3-clause", "https://example.org/license"))).isEqualTo("EPL-2.0 OR BSD-3-Clause");
         assertThat(expression(license("GPL-2.0-only WITH Classpath-exception-2.0", null))).isEqualTo("GPL-2.0-only WITH Classpath-exception-2.0");
         assertThat(expression(license("(MIT OR Apache-2.0) AND BSD-3-Clause", null))).isEqualTo("(MIT OR Apache-2.0) AND BSD-3-Clause");
+        assertThat(expression(license("(epl-2.0 or BSD-3-Clause)", null))).isEqualTo("(EPL-2.0 OR BSD-3-Clause)");
     }
 
     @Test
     void aNameWithAnOperatorThatIsNotMadeOfSpdxIdentifiersIsNotAnExpression() {
-        assertThat(MavenComponents.licenses(List.of(license("MIT OR Example-1.0", null))).getItems().get(0).getLicense().getName()).isEqualTo("MIT OR Example-1.0");
-        assertThat(MavenComponents.licenses(List.of(license("MIT WITH MIT", null))).getItems().get(0).getLicense().getName()).isEqualTo("MIT WITH MIT");
-        assertThat(MavenComponents.licenses(List.of(license("Apache OR MIT", null))).getItems().get(0).getLicense().getName()).isEqualTo("Apache OR MIT");
+        for (String name : List.of("MIT OR Example-1.0", "MIT WITH MIT", "Apache OR MIT")) {
+            assertThat(MavenComponents.licenses(List.of(license(name, null))).getItems().get(0).getLicense().getName()).isEqualTo(name);
+        }
     }
 
     @Test

@@ -3,6 +3,7 @@
 package org.thingsboard.sbom;
 
 import org.junit.jupiter.api.Test;
+import org.spdx.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,10 +29,15 @@ class SpdxExpressionsTest {
     @Test
     void textThatIsNotMadeOfIdentifiersAndOperatorsIsNotAnExpression() {
         for (String text : new String[] {"", "Apache2", "MIT License", "NONE", "NOASSERTION", "MIT OR Unknown-1.0", "MIT License OR EPL-2.0", "MIT OR", "OR MIT",
-                "MIT EPL-2.0", "(MIT OR EPL-2.0", "MIT OR EPL-2.0)", "MIT WITH", "MIT WITH EPL-2.0", "Classpath-exception-2.0 OR MIT", "MIT, EPL-2.0", "MIT / EPL-2.0"}) {
+                "MIT EPL-2.0", "(MIT OR EPL-2.0", "MIT OR EPL-2.0)", "MIT WITH", "MIT WITH EPL-2.0", "Classpath-exception-2.0 OR MIT", "MIT, EPL-2.0", "MIT / EPL-2.0", "MIT +", "MIT + OR EPL-2.0"}) {
             assertThat(SpdxExpressions.normalize(text)).as(text).isNull();
             assertThat(SpdxExpressions.normalizeCompound(text)).as(text).isNull();
         }
         assertThat(SpdxExpressions.normalize(null)).isNull();
+    }
+
+    @Test
+    void theLicenseListIsTheOneOfTheLibraryNotADownloadedOne() {
+        assertThat(Configuration.getInstance().getProperty("org.spdx.useJARLicenseInfoOnly")).isEqualTo("true");
     }
 }
