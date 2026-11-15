@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JarSbomTest {
 
-    private static final String ROOT = "pkg:maven/org.example/app@1.0?type=jar";
+    static final String ROOT = "pkg:maven/org.example/app@1.0?type=jar";
     private static final String A = "pkg:maven/org.example/a@1.0?type=jar";
     private static final String B = "pkg:maven/org.example/b@1.0?type=jar";
     private static final String C = "pkg:maven/org.example/c@1.0?type=jar";
@@ -60,6 +60,31 @@ class JarSbomTest {
     }
 
     @Test
+    void aLibraryThatTheGraphDoesNotHaveTakesItsPlaceFromThePoms() {
+        Map<String, Set<String>> graph = graph(ROOT, Set.of(A), A, Set.of());
+        Map<String, MavenComponents.Pom> poms = Map.of(
+                A, new MavenComponents.Pom("org.example:a::jar", Set.of("org.example:b::jar")),
+                B, new MavenComponents.Pom("org.example:b::jar", Set.of("org.example:c::jar", "org.example:not-packed::jar")),
+                C, new MavenComponents.Pom("org.example:c::jar", Set.of()));
+
+        assertThat(JarSbom.linkByPoms(graph, Set.of(B), poms)).isEmpty();
+
+        assertThat(graph).isEqualTo(graph(ROOT, Set.of(A), A, Set.of(B), B, Set.of(C)));
+    }
+
+    @Test
+    void aLibraryWithAnotherClassifierIsAnotherLibrary() {
+        Map<String, Set<String>> graph = graph(ROOT, Set.of(A), A, Set.of());
+        Map<String, MavenComponents.Pom> poms = Map.of(
+                A, new MavenComponents.Pom("org.example:a::jar", Set.of("org.example:b:native:jar")),
+                B, new MavenComponents.Pom("org.example:b::jar", Set.of()));
+
+        assertThat(JarSbom.linkByPoms(graph, Set.of(B), poms)).containsExactly(B);
+
+        assertThat(graph).isEqualTo(graph(ROOT, Set.of(A), A, Set.of(), B, Set.of()));
+    }
+
+    @Test
     void theSbomIsValidAndListsTheRootTheToolTheLibrariesAndTheirGraph() {
         ObjectNode bom = JarSbom.bom(component("app", ROOT), component("sbom-maven-plugin", null), List.of(component("a", A), component("b", B)),
                 graph(ROOT, Set.of(STARTER), STARTER, Set.of(A), A, Set.of(B), B, Set.of()), true);
@@ -94,7 +119,7 @@ class JarSbomTest {
                 .isInstanceOf(SbomException.class).hasMessageContaining("two libraries that are the same component: " + A);
     }
 
-    private static Component component(String name, String ref) {
+    static Component component(String name, String ref) {
         Component component = new Component();
         component.setType(Component.Type.LIBRARY);
         component.setGroup("org.example");

@@ -19,6 +19,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,6 +43,19 @@ class CycloneDxCliValidationIT {
     void mergedFixturesWithMetadataPassTheOfficialCliValidation() {
         ObjectNode merged = SbomMerger.merge(Boms.mavenFixture(), Boms.npmFixture(), Boms.HOST_PREFIX);
         ObjectNode updated = SbomMetadata.apply(merged, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD);
+
+        CliResult result = validate(updated);
+
+        assertThat(result.passed()).as(result.logs()).isTrue();
+    }
+
+    @Test
+    void theSbomOfAJarWithANestedSbomAndMetadataPassesTheOfficialCliValidation() {
+        ObjectNode jar = JarSbom.bom(JarSbomTest.component("app", JarSbomTest.ROOT), JarSbomTest.component("sbom-maven-plugin", null),
+                List.of(JarSbomTest.component("ui-ngx", "pkg:maven/org.thingsboard/ui-ngx@4.4.0?type=jar")),
+                Map.of(JarSbomTest.ROOT, Set.of("pkg:maven/org.thingsboard/ui-ngx@4.4.0?type=jar")), true);
+        ObjectNode merged = SbomMerger.merge(jar, Boms.npmFixture(), Boms.HOST_PREFIX);
+        ObjectNode updated = SbomMetadata.apply(merged, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, SbomMetadataTest.THINGSBOARD, "2026-01-31T12:00:00Z");
 
         CliResult result = validate(updated);
 

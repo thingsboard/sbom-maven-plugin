@@ -65,6 +65,33 @@ final class JarSbom {
     }
 
     /**
+     * Puts the libraries that the graph does not have into it, by what the poms say: such a library depends on the packed
+     * libraries that its pom names, and the packed libraries whose pom names it depend on it. Maven's graph can lack a
+     * dependency when the version that won a conflict sits under a test dependency.
+     *
+     * @param missing the bom-refs of the libraries to put into the graph
+     * @param poms    what the pom of each packed library says, by the bom-ref of the library
+     * @return the libraries that no pom of a packed library names
+     */
+    static Set<String> linkByPoms(Map<String, Set<String>> graph, Set<String> missing, Map<String, MavenComponents.Pom> poms) {
+        Map<String, String> refs = new HashMap<>();
+        poms.forEach((ref, pom) -> refs.put(pom.coordinates(), ref));
+        Set<String> withoutDependent = new LinkedHashSet<>(missing);
+        for (String ref : missing) {
+            MavenComponents.Pom own = poms.get(ref);
+            Set<String> dependsOn = graph.computeIfAbsent(ref, key -> new LinkedHashSet<>());
+            own.dependsOn().stream().map(refs::get).filter(target -> target != null && !target.equals(ref)).forEach(dependsOn::add);
+            poms.forEach((dependent, pom) -> {
+                if (!dependent.equals(ref) && pom.dependsOn().contains(own.coordinates())) {
+                    graph.computeIfAbsent(dependent, key -> new LinkedHashSet<>()).add(ref);
+                    withoutDependent.remove(ref);
+                }
+            });
+        }
+        return withoutDependent;
+    }
+
+    /**
      * The graph between the root and the packed libraries only. What depended on an artifact that is not packed depends on
      * what that artifact depended on instead, and a packed library that the graph does not have is a dependency of the root.
      */

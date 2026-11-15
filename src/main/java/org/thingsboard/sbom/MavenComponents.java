@@ -16,6 +16,7 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.cyclonedx.Version;
 import org.cyclonedx.model.Component;
 import org.cyclonedx.model.ExternalReference;
@@ -28,11 +29,14 @@ import org.cyclonedx.util.LicenseResolver;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Makes CycloneDX components of Maven artifacts: the coordinates and hashes of the artifact, and what its effective pom
@@ -44,10 +48,20 @@ final class MavenComponents {
 
     private static final Pattern OSI_OLD_URL = Pattern.compile("https?://(?:www\\.)?opensource\\.org/licenses/([^/]+?)(?:\\.php|\\.html|/)?", Pattern.CASE_INSENSITIVE);
 
+    private static final String OR_LATER = "-or-later";
+    private static final String CYCLONEDX_PLUGIN = "org.cyclonedx:cyclonedx-maven-plugin";
+
     private final MavenSession session;
     private final ProjectBuilder projectBuilder;
     private final ArtifactHandlerManager artifactHandlerManager;
     private final MavenProject project;
+    private final Map<String, Pom> poms = new LinkedHashMap<>();
+
+    /**
+     * What a pom says about the place of its library among the others: which artifact it is, without the version, and
+     * which artifacts it needs to run.
+     */
+    record Pom(String coordinates, Set<String> dependsOn) {}
 
     /**
      * @param project the project whose repositories the poms come from
@@ -85,11 +99,32 @@ final class MavenComponents {
         component.setPurl(purl(group, name, baseVersion, type, classifier));
         component.setBomRef(component.getPurl());
         try {
-            describe(effectiveProject(group, name, version), component);
+            MavenProject pom = effectiveProject(group, name, version);
+            // As cyclonedx-maven-plugin does: a project that states the type of its component there is of that type
+            if (pom.getPlugin(CYCLONEDX_PLUGIN) != null && pom.getPlugin(CYCLONEDX_PLUGIN).getConfiguration() instanceof Xpp3Dom configuration
+                    && configuration.getChild("projectType") != null) {
+                component.setType(componentType(configuration.getChild("projectType").getValue()));
+            }
+            describe(pom, component);
+            poms.put(component.getBomRef(), new Pom(coordinates(group, name, classifier, type), pom.getDependencies().stream()
+                    .filter(dependency -> !Artifact.SCOPE_TEST.equals(dependency.getScope()) && !Artifact.SCOPE_PROVIDED.equals(dependency.getScope()))
+                    .map(dependency -> coordinates(dependency.getGroupId(), dependency.getArtifactId(), dependency.getClassifier(), dependency.getType()))
+                    .collect(Collectors.toSet())));
         } catch (ProjectBuildingException e) {
             throw new SbomException("The pom of " + component.getPurl() + " could not be read, so the SBOM cannot give its license: " + e.getMessage(), e);
         }
         return component;
+    }
+
+    /**
+     * What the poms of the libraries made so far say, by the bom-ref of the library.
+     */
+    Map<String, Pom> poms() {
+        return poms;
+    }
+
+    private static String coordinates(String group, String name, String classifier, String type) {
+        return group + ":" + name + ":" + (classifier == null ? "" : classifier) + ":" + (type == null || type.isEmpty() ? "jar" : type);
     }
 
     /**
@@ -191,51 +226,63 @@ final class MavenComponents {
     static LicenseChoice licenses(List<org.apache.maven.model.License> pomLicenses) {
         LicenseChoice choice = new LicenseChoice();
         for (org.apache.maven.model.License pomLicense : pomLicenses) {
-            if (resolve(choice, pomLicense.getName()) || resolveUrl(choice, pomLicense.getUrl()) || pomLicense.getName() == null) {
+            LicenseItem resolved = resolve(pomLicense.getName());
+            if (resolved == null) {
+                resolved = resolveUrl(pomLicense.getUrl());
+            }
+            if (resolved == null && pomLicense.getName() != null) {
+                License license = new License();
+                license.setName(pomLicense.getName().trim());
+                String url = uri(pomLicense.getUrl());
+                if (url != null) {
+                    license.setUrl(url);
+                }
+                resolved = LicenseItem.ofLicense(license);
+            }
+            if (resolved == null) {
                 continue;
             }
-            License license = new License();
-            license.setName(pomLicense.getName().trim());
-            String url = uri(pomLicense.getUrl());
-            if (url != null) {
-                license.setUrl(url);
+            // CycloneDX has either licenses or one expression: as in cyclonedx-maven-plugin, the later of the two kinds stays
+            boolean expression = resolved.getExpression() != null;
+            if (expression || choice.getItems() != null && choice.getItems().stream().anyMatch(item -> item.getExpression() != null)) {
+                choice.setItems(new ArrayList<>());
             }
-            choice.addLicense(license);
+            choice.addItem(resolved);
         }
         return choice;
     }
 
     /**
      * The Open Source Initiative moved its license pages from {@code opensource.org/licenses/<id>} to {@code opensource.org/license/<id>},
-     * and the SPDX license list knows only the new address, while poms give the old one.
+     * and the SPDX license list knows only the new address, while poms give the old one. For a license that has an
+     * "only" and an "or later" form, the list gives the new address to the "or later" form alone; the address names
+     * a version and nothing later, so it stands for the "only" form here, as it did in the list before.
      */
-    private static boolean resolveUrl(LicenseChoice choice, String url) {
-        if (resolve(choice, url)) {
-            return true;
-        }
+    private static LicenseItem resolveUrl(String url) {
+        LicenseItem resolved = resolve(url);
         Matcher old = OSI_OLD_URL.matcher(url == null ? "" : url.trim());
-        return old.matches() && resolve(choice, "https://opensource.org/license/" + old.group(1));
+        if (resolved != null || !old.matches()) {
+            return resolved;
+        }
+        resolved = resolve("https://opensource.org/license/" + old.group(1));
+        if (resolved == null || resolved.getLicense() == null || resolved.getLicense().getId() == null || !resolved.getLicense().getId().endsWith(OR_LATER)) {
+            return resolved;
+        }
+        String id = resolved.getLicense().getId();
+        LicenseItem only = resolve(id.substring(0, id.length() - OR_LATER.length()) + "-only");
+        return only != null ? only : resolved;
     }
 
-    private static boolean resolve(LicenseChoice choice, String nameOrUrl) {
+    /**
+     * @return the license that the name or URL stands for, else the license expression, else null
+     */
+    private static LicenseItem resolve(String nameOrUrl) {
         LicenseChoice resolved = nameOrUrl == null ? null : LicenseResolver.resolve(nameOrUrl, false);
         if (resolved == null || resolved.getItems() == null) {
-            return false;
+            return null;
         }
-        for (LicenseItem item : resolved.getItems()) {
-            if (item.getLicense() != null) {
-                choice.addLicense(item.getLicense());
-                return true;
-            }
-        }
-        for (LicenseItem item : resolved.getItems()) {
-            if (item.getExpression() != null) {
-                // CycloneDX has either licenses or one expression, so the expression stands alone
-                choice.setItems(new ArrayList<>(List.of(item)));
-                return true;
-            }
-        }
-        return false;
+        return resolved.getItems().stream().filter(item -> item.getLicense() != null).findFirst()
+                .or(() -> resolved.getItems().stream().filter(item -> item.getExpression() != null).findFirst()).orElse(null);
     }
 
     /**

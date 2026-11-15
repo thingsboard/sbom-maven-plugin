@@ -31,7 +31,9 @@ class MavenComponentsTest {
     void theOldAddressOfAnOpenSourceInitiativePageStandsForTheSameLicense() {
         assertThat(ids(license("BSD New license", "http://opensource.org/licenses/BSD-3-Clause"))).containsExactly("BSD-3-Clause");
         assertThat(ids(license("BSD 3", "https://www.opensource.org/licenses/bsd-3-clause.php"))).containsExactly("BSD-3-Clause");
-        assertThat(ids(license("An LGPL license", "https://www.opensource.org/licenses/LGPL-2.1"))).containsExactly("LGPL-2.1-or-later");
+        // The address names a version and nothing later
+        assertThat(ids(license("An LGPL license", "https://www.opensource.org/licenses/LGPL-2.1"))).containsExactly("LGPL-2.1-only");
+        assertThat(ids(license("A GPL license", "http://www.opensource.org/licenses/gpl-2.0.php"))).containsExactly("GPL-2.0-only");
         assertThat(ids(license("Example License", "https://opensource.org/licenses/unknown"))).containsExactly((String) null);
     }
 
@@ -51,6 +53,19 @@ class MavenComponentsTest {
 
         assertThat(licenses.getItems()).extracting(item -> item.getLicense().getId() != null ? item.getLicense().getId() : item.getLicense().getName())
                 .containsExactly("MIT", "Example License");
+    }
+
+    @Test
+    void anExpressionAndALicenseAreNotListedTogetherAndTheLaterOneStays() {
+        License expression = license("CDDL + GPLv2 with classpath exception", null);
+
+        LicenseChoice licenseLast = MavenComponents.licenses(List.of(expression, license("MIT", null)));
+        LicenseChoice expressionLast = MavenComponents.licenses(List.of(license("MIT", null), expression));
+
+        assertThat(licenseLast.getItems()).hasSize(1);
+        assertThat(licenseLast.getItems().get(0).getLicense().getId()).isEqualTo("MIT");
+        assertThat(expressionLast.getItems()).hasSize(1);
+        assertThat(expressionLast.getItems().get(0).getExpression()).isNotNull();
     }
 
     @Test

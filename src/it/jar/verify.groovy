@@ -7,7 +7,7 @@ import java.util.zip.ZipFile
 
 def bootJar = new File(basedir, 'target/app-1.0-boot.jar')
 def plainJar = new File(basedir, 'target/app-1.0.jar')
-def sbomFile = new File(basedir, 'target/classes/META-INF/sbom/application.cdx.json')
+def sbomFile = new File(basedir, 'target/sbom/application.cdx.json')
 
 // The launch script of the executable jar is still in front of the archive
 assert bootJar.newInputStream().withCloseable { new String(it.readNBytes(11)) } == '#!/bin/bash'
