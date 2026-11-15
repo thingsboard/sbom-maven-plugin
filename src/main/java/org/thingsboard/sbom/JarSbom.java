@@ -14,6 +14,7 @@ import org.cyclonedx.model.Property;
 import org.cyclonedx.model.metadata.ToolInformation;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -71,7 +72,7 @@ final class JarSbom {
      *
      * @param missing the bom-refs of the libraries to put into the graph
      * @param poms    what the pom of each packed library says, by the bom-ref of the library
-     * @return the libraries that no pom of a packed library names
+     * @return the libraries that no pom of a packed library names; {@link #packedGraph} makes them dependencies of the root
      */
     static Set<String> linkByPoms(Map<String, Set<String>> graph, Set<String> missing, Map<String, MavenComponents.Pom> poms) {
         Map<String, String> refs = new HashMap<>();
@@ -93,7 +94,8 @@ final class JarSbom {
 
     /**
      * The graph between the root and the packed libraries only. What depended on an artifact that is not packed depends on
-     * what that artifact depended on instead, and a packed library that the graph does not have is a dependency of the root.
+     * what that artifact depended on instead, and a packed library that nothing depends on is a dependency of the root, so
+     * every library is reached from the root.
      */
     static Map<String, Set<String>> packedGraph(Map<String, Set<String>> graph, String rootRef, Set<String> packed) {
         Map<String, Set<String>> result = new LinkedHashMap<>();
@@ -114,9 +116,16 @@ final class JarSbom {
             dependsOn.removeAll(removed);
             dependsOn.remove(ref);
         });
+        packed.forEach(ref -> result.putIfAbsent(ref, new LinkedHashSet<>()));
+        Set<String> dependedOn = new HashSet<>();
+        result.values().forEach(dependedOn::addAll);
+        packed.stream().filter(ref -> !dependedOn.contains(ref)).forEach(result.get(rootRef)::add);
+        // What is left out of reach is libraries that depend on each other in a circle and that nothing else depends on
+        Set<String> reached = SbomChecks.reachableFrom(rootRef, result);
         for (String ref : packed) {
-            if (result.putIfAbsent(ref, new LinkedHashSet<>()) == null) {
+            if (!reached.contains(ref)) {
                 result.get(rootRef).add(ref);
+                SbomChecks.reachableFrom(ref, result, reached);
             }
         }
         return result;

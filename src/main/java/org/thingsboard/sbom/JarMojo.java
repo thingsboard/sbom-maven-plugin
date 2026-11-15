@@ -162,7 +162,7 @@ public class JarMojo extends SbomMojo {
         SbomChecks.check(!packed.isEmpty(), "Jar " + jarPath + " packs no libraries in " + libraryDirectory
                 + ". Set the jar parameter to the jar that packs them");
 
-        MavenComponents maven = new MavenComponents(session, project, projectBuilder, artifactHandlerManager);
+        MavenComponents maven = new MavenComponents(session, project, projectBuilder, artifactHandlerManager, getLog()::warn);
         Map<String, Artifact> artifacts = artifactsByFileName(project.getArtifacts());
         List<Component> components = new ArrayList<>();
         Set<String> dependencies = new LinkedHashSet<>();

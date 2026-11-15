@@ -73,15 +73,38 @@ class JarSbomTest {
     }
 
     @Test
-    void aLibraryWithAnotherClassifierIsAnotherLibrary() {
+    void aLibraryThatNoPomNamesIsADependencyOfTheRoot() {
         Map<String, Set<String>> graph = graph(ROOT, Set.of(A), A, Set.of());
+        // Another classifier is another library
         Map<String, MavenComponents.Pom> poms = Map.of(
                 A, new MavenComponents.Pom("org.example:a::jar", Set.of("org.example:b:native:jar")),
                 B, new MavenComponents.Pom("org.example:b::jar", Set.of()));
 
         assertThat(JarSbom.linkByPoms(graph, Set.of(B), poms)).containsExactly(B);
 
-        assertThat(graph).isEqualTo(graph(ROOT, Set.of(A), A, Set.of(), B, Set.of()));
+        assertThat(JarSbom.packedGraph(graph, ROOT, Set.of(A, B))).isEqualTo(graph(ROOT, Set.of(A, B), A, Set.of(), B, Set.of()));
+    }
+
+    @Test
+    void aLibraryOutsideTheGraphWhosePomNamesAMissingOneStaysADependencyOfTheRoot() {
+        Map<String, Set<String>> graph = graph(ROOT, Set.of(A), A, Set.of());
+        Map<String, MavenComponents.Pom> poms = Map.of(
+                A, new MavenComponents.Pom("org.example:a::jar", Set.of()),
+                B, new MavenComponents.Pom("org.example:b::jar", Set.of()),
+                C, new MavenComponents.Pom("org.example:c::jar", Set.of("org.example:b::jar")));
+
+        assertThat(JarSbom.linkByPoms(graph, Set.of(B), poms)).isEmpty();
+
+        assertThat(JarSbom.packedGraph(graph, ROOT, Set.of(A, B, C))).isEqualTo(graph(ROOT, Set.of(A, C), A, Set.of(), B, Set.of(), C, Set.of(B)));
+    }
+
+    @Test
+    void librariesThatOnlyDependOnEachOtherAreReachedFromTheRoot() {
+        Map<String, Set<String>> graph = graph(ROOT, Set.of(A), A, Set.of(), B, Set.of(C), C, Set.of(B));
+
+        Map<String, Set<String>> packed = JarSbom.packedGraph(graph, ROOT, Set.of(A, B, C));
+
+        assertThat(SbomChecks.reachableFrom(ROOT, packed)).contains(A, B, C);
     }
 
     @Test

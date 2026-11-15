@@ -8,6 +8,7 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
 import org.apache.maven.execution.MavenSession;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.model.MailingList;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
@@ -34,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -41,12 +44,13 @@ import java.util.stream.Collectors;
 /**
  * Makes CycloneDX components of Maven artifacts: the coordinates and hashes of the artifact, and what its effective pom
  * says about it. A component has the fields that {@code cyclonedx-maven-plugin} gives it, by the same rules, except that
- * the old address of a license page of the Open Source Initiative is known too.
+ * the old address of a license page of the Open Source Initiative is known too, and such a page stands for the license
+ * of the version it names and no later one.
  */
 final class MavenComponents {
     static final Version SPEC_VERSION = Version.VERSION_16;
 
-    private static final Pattern OSI_OLD_URL = Pattern.compile("https?://(?:www\\.)?opensource\\.org/licenses/([^/]+?)(?:\\.php|\\.html|/)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OSI_URL = Pattern.compile("https?://(?:www\\.)?opensource\\.org/licenses?/([^/]+?)(?:\\.php|\\.html|/)?", Pattern.CASE_INSENSITIVE);
 
     private static final String OR_LATER = "-or-later";
     private static final String CYCLONEDX_PLUGIN = "org.cyclonedx:cyclonedx-maven-plugin";
@@ -55,6 +59,7 @@ final class MavenComponents {
     private final ProjectBuilder projectBuilder;
     private final ArtifactHandlerManager artifactHandlerManager;
     private final MavenProject project;
+    private final Consumer<String> warn;
     private final Map<String, Pom> poms = new LinkedHashMap<>();
 
     /**
@@ -65,12 +70,14 @@ final class MavenComponents {
 
     /**
      * @param project the project whose repositories the poms come from
+     * @param warn    takes what a pom says that cannot be used
      */
-    MavenComponents(MavenSession session, MavenProject project, ProjectBuilder projectBuilder, ArtifactHandlerManager artifactHandlerManager) {
+    MavenComponents(MavenSession session, MavenProject project, ProjectBuilder projectBuilder, ArtifactHandlerManager artifactHandlerManager, Consumer<String> warn) {
         this.session = session;
         this.project = project;
         this.projectBuilder = projectBuilder;
         this.artifactHandlerManager = artifactHandlerManager;
+        this.warn = warn;
     }
 
     /**
@@ -100,16 +107,10 @@ final class MavenComponents {
         component.setBomRef(component.getPurl());
         try {
             MavenProject pom = effectiveProject(group, name, version);
-            // As cyclonedx-maven-plugin does: a project that states the type of its component there is of that type
-            if (pom.getPlugin(CYCLONEDX_PLUGIN) != null && pom.getPlugin(CYCLONEDX_PLUGIN).getConfiguration() instanceof Xpp3Dom configuration
-                    && configuration.getChild("projectType") != null) {
-                component.setType(componentType(configuration.getChild("projectType").getValue()));
-            }
+            component.setType(libraryType(pom, component.getPurl(), warn));
             describe(pom, component);
-            poms.put(component.getBomRef(), new Pom(coordinates(group, name, classifier, type), pom.getDependencies().stream()
-                    .filter(dependency -> !Artifact.SCOPE_TEST.equals(dependency.getScope()) && !Artifact.SCOPE_PROVIDED.equals(dependency.getScope()))
-                    .map(dependency -> coordinates(dependency.getGroupId(), dependency.getArtifactId(), dependency.getClassifier(), dependency.getType()))
-                    .collect(Collectors.toSet())));
+            poms.put(component.getBomRef(), pom(coordinates(group, name, classifier, type), pom.getDependencies(),
+                    dependencyType -> artifactHandlerManager.getArtifactHandler(dependencyType).getClassifier()));
         } catch (ProjectBuildingException e) {
             throw new SbomException("The pom of " + component.getPurl() + " could not be read, so the SBOM cannot give its license: " + e.getMessage(), e);
         }
@@ -123,8 +124,41 @@ final class MavenComponents {
         return poms;
     }
 
+    /**
+     * As {@code cyclonedx-maven-plugin} does: a project that states the type of its component in the configuration of
+     * that plugin is of that type, and of the type library when what it states is not a type.
+     */
+    static Component.Type libraryType(MavenProject pom, String purl, Consumer<String> warn) {
+        if (pom.getPlugin(CYCLONEDX_PLUGIN) == null || !(pom.getPlugin(CYCLONEDX_PLUGIN).getConfiguration() instanceof Xpp3Dom configuration)
+                || configuration.getChild("projectType") == null) {
+            return Component.Type.LIBRARY;
+        }
+        String stated = configuration.getChild("projectType").getValue();
+        for (Component.Type candidate : Component.Type.values()) {
+            if (candidate.getTypeName().equalsIgnoreCase(stated)) {
+                return candidate;
+            }
+        }
+        warn.accept("The pom of " + purl + " states projectType '" + stated + "', which is not a CycloneDX component type: the component is a library");
+        return Component.Type.LIBRARY;
+    }
+
+    /**
+     * What a pom says with the names Maven's graph uses: a dependency of a transitive dependency is followed unless it
+     * is optional or of the test or provided scope, and a dependency without a classifier has the one of its type.
+     *
+     * @param classifierOfType the classifier that an artifact type stands for, if any: {@code tests} for {@code test-jar}
+     */
+    static Pom pom(String coordinates, List<Dependency> dependencies, UnaryOperator<String> classifierOfType) {
+        return new Pom(coordinates, dependencies.stream()
+                .filter(dependency -> !dependency.isOptional() && !Artifact.SCOPE_TEST.equals(dependency.getScope()) && !Artifact.SCOPE_PROVIDED.equals(dependency.getScope()))
+                .map(dependency -> coordinates(dependency.getGroupId(), dependency.getArtifactId(),
+                        isBlank(dependency.getClassifier()) ? classifierOfType.apply(dependency.getType()) : dependency.getClassifier(), dependency.getType()))
+                .collect(Collectors.toSet()));
+    }
+
     private static String coordinates(String group, String name, String classifier, String type) {
-        return group + ":" + name + ":" + (classifier == null ? "" : classifier) + ":" + (type == null || type.isEmpty() ? "jar" : type);
+        return group + ":" + name + ":" + (isBlank(classifier) ? "" : classifier) + ":" + (type == null || type.isEmpty() ? "jar" : type);
     }
 
     /**
@@ -256,15 +290,17 @@ final class MavenComponents {
      * The Open Source Initiative moved its license pages from {@code opensource.org/licenses/<id>} to {@code opensource.org/license/<id>},
      * and the SPDX license list knows only the new address, while poms give the old one. For a license that has an
      * "only" and an "or later" form, the list gives the new address to the "or later" form alone; the address names
-     * a version and nothing later, so it stands for the "only" form here, as it did in the list before.
+     * a version and nothing later, so either address stands for the "only" form here, as it did in the list before.
      */
     private static LicenseItem resolveUrl(String url) {
         LicenseItem resolved = resolve(url);
-        Matcher old = OSI_OLD_URL.matcher(url == null ? "" : url.trim());
-        if (resolved != null || !old.matches()) {
+        Matcher page = OSI_URL.matcher(url == null ? "" : url.trim());
+        if (!page.matches()) {
             return resolved;
         }
-        resolved = resolve("https://opensource.org/license/" + old.group(1));
+        if (resolved == null) {
+            resolved = resolve("https://opensource.org/license/" + page.group(1));
+        }
         if (resolved == null || resolved.getLicense() == null || resolved.getLicense().getId() == null || !resolved.getLicense().getId().endsWith(OR_LATER)) {
             return resolved;
         }
