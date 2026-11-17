@@ -165,7 +165,9 @@ final class BundledComponents {
         if (component.getLicense() != null && !component.getLicense().isBlank()) {
             String license = SpdxExpressions.normalize(component.getLicense());
             check(license != null, "Bundled component " + component.ref() + " has the license '" + component.getLicense()
-                    + "', which is not an SPDX license expression");
+                    + "', which is not an SPDX license expression. Nothing can match free text to a license reliably."
+                    + " Write it as an identifier such as MIT, or an expression such as EPL-2.0 OR BSD-3-Clause:"
+                    + " https://spdx.org/licenses");
             SbomJson.putLicense(json, license);
         }
         if (component.getPurl() != null && !component.getPurl().isBlank()) {
