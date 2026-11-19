@@ -41,33 +41,36 @@
                 <groupId>@project.groupId@</groupId>
                 <artifactId>@project.artifactId@</artifactId>
                 <version>@project.version@</version>
+                <!-- Shared by the bundled and the package goals -->
+                <configuration>
+                    <name>app</name>
+                    <version>1.0.0</version>
+                    <packages>
+                        <package>
+                            <id>deb</id>
+                            <file>${project.basedir}/dist/missing.deb</file>
+                            <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
+                        </package>
+                        <package>
+                            <id>rpm</id>
+                            <file>${project.basedir}/dist/app.rpm</file>
+                            <purl>pkg:rpm/example/app@1.0.0-1?arch=noarch</purl>
+                            <skip>true</skip>
+                        </package>
+                        <package>
+                            <id>zip</id>
+                            <file>${project.basedir}/dist/app-windows.zip</file>
+                            <purl>pkg:generic/example/app-windows@1.0.0</purl>
+                        </package>
+                    </packages>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>package-sbom</id>
+                        <id>bundled-sbom</id>
                         <goals>
-                            <goal>package</goal>
+                            <goal>bundled</goal>
                         </goals>
                         <configuration>
-                            <name>app</name>
-                            <version>1.0.0</version>
-                            <packages>
-                                <package>
-                                    <id>deb</id>
-                                    <file>${project.basedir}/dist/app.deb</file>
-                                    <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
-                                </package>
-                                <package>
-                                    <id>rpm</id>
-                                    <file>${project.basedir}/dist/app.rpm</file>
-                                    <purl>pkg:rpm/example/app@1.0.0-1?arch=noarch</purl>
-                                    <skip>true</skip>
-                                </package>
-                                <package>
-                                    <id>zip</id>
-                                    <file>${project.basedir}/dist/app-windows.zip</file>
-                                    <purl>pkg:generic/example/app-windows@1.0.0</purl>
-                                </package>
-                            </packages>
                             <components>
                                 <component>
                                     <name>extension</name>
@@ -97,10 +100,25 @@
                                     <name>service-wrapper</name>
                                     <version>2.0.1</version>
                                     <purl>pkg:maven/com.example/service-wrapper@2.0.1?type=exe</purl>
-                                    <file>${project.basedir}/dist/service.exe</file>
+                                    <file>${project.basedir}/dist/app-windows.zip</file>
                                     <packages>
                                         <package>zip</package>
                                     </packages>
+                                </component>
+                            </components>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>package-sbom</id>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
+                        <!-- Left over from a configuration before 3.0.0 -->
+                        <configuration>
+                            <components>
+                                <component>
+                                    <name>extension</name>
+                                    <file>${project.basedir}/data/extension.js</file>
                                 </component>
                             </components>
                         </configuration>

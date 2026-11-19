@@ -13,9 +13,10 @@ import java.util.List;
 
 /**
  * Writes one SBOM per distribution package ({@code .deb}, {@code .rpm}, {@code .zip}) to {@code <package file>.cdx.json}.
- * The package becomes the root component and depends on the application SBOM's root and on the bundled components it contains.
- * No package SBOM is written when any check fails. Runs at {@code package} by default: declare the plugin after the
- * plugins that build the packages, so it runs after them in the same phase.
+ * The package becomes the root component and depends on the application SBOM's root and on the components that the bundled
+ * SBOM of the package lists, which the {@code bundled} goal writes. No package SBOM is written when any check fails. Runs at
+ * {@code package} by default: declare the plugin after the plugins that build the packages, so it runs after them in the
+ * same phase.
  */
 @Mojo(name = "package", defaultPhase = LifecyclePhase.PACKAGE, threadSafe = true)
 public class PackageMojo extends SbomMojo {
@@ -45,13 +46,19 @@ public class PackageMojo extends SbomMojo {
     private List<PackageFile> packages = new ArrayList<>();
 
     /**
-     * Bundled components: {@code type} (default {@code library}), {@code group}, {@code name}, {@code version},
-     * {@code description}, {@code purl}, {@code cpe}, {@code license} (an SPDX expression, or the build fails), {@code supplier}, {@code file},
-     * {@code sbom} (CycloneDX SBOM of {@code file}; replaces all the other details) and {@code packages}
-     * (ids of the packages that contain it; all when empty).
+     * Directory with the bundled SBOMs of the packages, {@code <name>-<package id>.bundled.cdx.json}, which the
+     * {@code bundled} goal writes.
+     */
+    @Parameter(property = "sbom.bundled.directory", defaultValue = "${project.build.directory}/sbom", required = true)
+    private File bundledDirectory;
+
+    /**
+     * No longer taken: the bundled components moved to the {@code bundled} goal in 3.0.0. Maven ignores a parameter that a
+     * goal does not have, so a configuration from before would lose them from the package SBOMs without a word; set, this
+     * fails the build instead.
      */
     @Parameter
-    private List<BundledComponent> components = new ArrayList<>();
+    private List<BundledComponent> components;
 
     /**
      * Skip all packages.
@@ -71,10 +78,11 @@ public class PackageMojo extends SbomMojo {
 
     @Override
     void run() {
-        List<BundledComponent> bundled = components == null ? List.of() : components;
-        SbomPackage.checkConfig(packages, bundled);
+        SbomChecks.check(components == null || components.isEmpty(), "The package goal no longer takes components: move <components> from"
+                + " this execution to an execution of the bundled goal, which writes what each package bundles before the packages are built");
+        SbomPackage.checkConfig(packages);
         packages.stream().filter(PackageFile::isSkip).forEach(packageFile -> getLog().info("Skipping package SBOM for " + packageFile.getId()));
-        for (Path output : SbomPackage.writeAll(sourceFile.toPath(), name, version, packages, bundled)) {
+        for (Path output : SbomPackage.writeAll(sourceFile.toPath(), bundledDirectory.toPath(), name, version, packages)) {
             getLog().info("Wrote package SBOM " + output);
         }
     }

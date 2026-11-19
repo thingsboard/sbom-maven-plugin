@@ -41,33 +41,36 @@
                 <groupId>@project.groupId@</groupId>
                 <artifactId>@project.artifactId@</artifactId>
                 <version>@project.version@</version>
+                <!-- Shared by the bundled and the package goals -->
+                <configuration>
+                    <name>app</name>
+                    <version>1.0.0</version>
+                    <packages>
+                        <package>
+                            <id>deb</id>
+                            <file>${project.basedir}/dist/missing.deb</file>
+                            <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
+                        </package>
+                        <package>
+                            <id>rpm</id>
+                            <file>${project.basedir}/dist/app.rpm</file>
+                            <purl>pkg:rpm/example/app@1.0.0-1?arch=noarch</purl>
+                            <skip>true</skip>
+                        </package>
+                        <package>
+                            <id>zip</id>
+                            <file>${project.basedir}/dist/app-windows.zip</file>
+                            <purl>pkg:generic/example/app-windows@1.0.0</purl>
+                        </package>
+                    </packages>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>package-sbom</id>
+                        <id>bundled-sbom</id>
                         <goals>
-                            <goal>package</goal>
+                            <goal>bundled</goal>
                         </goals>
                         <configuration>
-                            <name>app</name>
-                            <version>1.0.0</version>
-                            <packages>
-                                <package>
-                                    <id>deb</id>
-                                    <file>${project.basedir}/dist/missing.deb</file>
-                                    <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
-                                </package>
-                                <package>
-                                    <id>rpm</id>
-                                    <file>${project.basedir}/dist/app.rpm</file>
-                                    <purl>pkg:rpm/example/app@1.0.0-1?arch=noarch</purl>
-                                    <skip>true</skip>
-                                </package>
-                                <package>
-                                    <id>zip</id>
-                                    <file>${project.basedir}/dist/app-windows.zip</file>
-                                    <purl>pkg:generic/example/app-windows@1.0.0</purl>
-                                </package>
-                            </packages>
                             <components>
                                 <component>
                                     <name>extension</name>
@@ -104,6 +107,12 @@
                                 </component>
                             </components>
                         </configuration>
+                    </execution>
+                    <execution>
+                        <id>package-sbom</id>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
