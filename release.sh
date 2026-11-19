@@ -18,7 +18,9 @@ die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 [ $# -ge 1 ] && [ $# -le 2 ] || die "usage: $0 <release version> [<next development version>]"
 readonly version=$1 next_version=${2:-}
-readonly tag=v$version branch=release/$version
+# Every release is marked by the tag and by the release branch, which GitHub keeps from being deleted or moved. The PR
+# goes out from a branch of its own, so that a release that stops before it is merged leaves nothing that stays.
+readonly tag=v$version branch=release/$version pr_branch=chore/release-$version
 
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "release version must look like 1.2.3, got '$version'"
 [ -z "$next_version" ] || [[ $next_version =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]] \
@@ -36,7 +38,8 @@ grep -q "<id>$DEPLOY_SERVER_ID</id>" ~/.m2/settings.xml 2>/dev/null \
 git fetch --quiet origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "main is not up to date with origin/main"
 ! git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || die "tag $tag already exists locally"
-[ -z "$(git ls-remote origin "refs/tags/$tag" "refs/heads/$branch")" ] || die "tag $tag or branch $branch already exists on GitHub"
+[ -z "$(git ls-remote origin "refs/tags/$tag" "refs/heads/$branch" "refs/heads/$pr_branch")" ] \
+    || die "tag $tag, branch $branch or branch $pr_branch already exists on GitHub"
 
 step "Preparing $tag on $branch"
 git switch --create "$branch"
@@ -46,11 +49,11 @@ git log --oneline -2
 
 step "Opening the release PR"
 # --no-follow-tags: the release tag must not reach GitHub before the PR is merged
-git push --no-follow-tags --set-upstream origin "$branch" \
-    || die "pushing $branch failed; nothing is published: see \"Releasing\" in README.md to start over"
-pr_url=$(gh pr create --base main --head "$branch" --title "chore: release $tag" \
+git push --no-follow-tags --set-upstream origin "$branch:refs/heads/$pr_branch" \
+    || die "pushing $pr_branch failed; nothing is published: see \"Releasing\" in README.md to start over"
+pr_url=$(gh pr create --base main --head "$pr_branch" --title "chore: release $tag" \
     --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.") \
-    || die "opening the PR for $branch failed; nothing is published: open it by hand, or see \"Releasing\" in README.md to start over"
+    || die "opening the PR for $pr_branch failed; nothing is published: open it by hand, or see \"Releasing\" in README.md to start over"
 echo "$pr_url"
 
 step "Waiting for the PR checks"
@@ -68,11 +71,12 @@ gh pr merge "$pr_url" --merge \
     || die "merging $pr_url failed; nothing is published: merge it by hand (merge commit) and finish the release by hand, or start over: see \"Releasing\" in README.md"
 
 # From here on, "Finish the release by hand" in README.md repeats these steps: keep the two in sync
-step "Pushing $tag"
+step "Pushing $tag and $branch"
 git fetch --quiet origin main || die "fetching main failed: finish the release by hand: see \"Releasing\" in README.md"
-git merge-base --is-ancestor "$tag" origin/main \
-    || die "$tag is not in main's history (was the PR squashed or rebased?): do not push it; delete the local $tag tag and $branch branch, then run release.sh again"
-git push origin "refs/tags/$tag" || die "pushing $tag failed: finish the release by hand: see \"Releasing\" in README.md"
+git merge-base --is-ancestor "$branch" origin/main \
+    || die "$branch is not in main's history (was the PR squashed or rebased?): do not push $tag or $branch; delete the local $tag tag and $branch branch, then run release.sh again"
+git push origin "refs/tags/$tag" "$branch:refs/heads/$branch" \
+    || die "pushing $tag or $branch failed: finish the release by hand: see \"Releasing\" in README.md"
 
 step "Building $tag and deploying it to $DEPLOY_SERVER_ID"
 ./mvnw -B release:perform \

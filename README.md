@@ -327,24 +327,26 @@ Releases are deployed to `https://repo.thingsboard.io/artifactory/libs-release-p
 ./release.sh 1.0.0 1.0.1-SNAPSHOT
 ```
 
+Every release is marked twice on GitHub, and neither mark is ever deleted or moved: the tag `v1.0.0` on the commit of the release, and the branch `release/1.0.0` on the commit after it, which starts the next development version.
+
 The next development version is optional and defaults to the next patch version. The script stops at the first failure, and:
 
-1. Runs `release:prepare` on a new `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
-2. Pushes the branch, opens a PR and waits for its checks.
-3. Merges the PR once the checks pass. `main` takes only merge commits, so the tagged commit stays in its history.
-4. Pushes the tag, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
+1. Runs `release:prepare` on a new local `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
+2. Pushes the branch as `chore/release-1.0.0`, opens a PR from it and waits for its checks.
+3. Merges the PR once the checks pass. `main` takes only merge commits, so the tagged commit stays in its history; GitHub then deletes `chore/release-1.0.0`.
+4. Pushes the tag and the `release/1.0.0` branch, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
 5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
 
 The release builds skip the tests, since CI has run them on the PR.
 
 If the script stops, its last message says what to do:
 
-- **Start over** when it stops before the PR is merged: nothing is published yet. Close the PR if one was opened, run `git switch --discard-changes main`, then delete the `release/1.0.0` branch (locally and on GitHub) and the local `v1.0.0` tag.
+- **Start over** when it stops before the PR is merged: nothing is published yet. Close the PR if one was opened, run `git switch --discard-changes main`, then delete the local `release/1.0.0` branch and `v1.0.0` tag, and the `chore/release-1.0.0` branch on GitHub.
 - **Finish the release by hand** when it stops after the PR is merged. From the same clone, run the steps that have not run yet:
 
   ```
-  git fetch origin main && git merge-base --is-ancestor v1.0.0 origin/main   # must succeed: else don't push the tag, start over
-  git push origin v1.0.0
+  git fetch origin main && git merge-base --is-ancestor release/1.0.0 origin/main   # must succeed: else push nothing, start over
+  git push origin v1.0.0 release/1.0.0:refs/heads/release/1.0.0
   ./mvnw release:perform
   gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0 target/checkout/target/sbom-maven-plugin-1.0.0.jar
   git switch main && git pull --ff-only && git branch --delete release/1.0.0
