@@ -11,7 +11,7 @@
 
     <groupId>org.thingsboard</groupId>
     <artifactId>sbom-maven-plugin</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>3.0.0</version>
     <packaging>maven-plugin</packaging>
 
     <name>ThingsBoard SBOM Maven Plugin</name>
@@ -45,7 +45,7 @@
         <url>https://github.com/thingsboard/sbom-maven-plugin</url>
         <connection>scm:git:https://github.com/thingsboard/sbom-maven-plugin.git</connection>
         <developerConnection>scm:git:git@github.com:thingsboard/sbom-maven-plugin.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>v3.0.0</tag>
     </scm>
 
     <issueManagement>
@@ -62,7 +62,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Fixed so every build of the same sources produces identical artifacts; release:prepare sets it to the release time -->
-        <project.build.outputTimestamp>2026-11-17T09:00:38Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-11-19T08:34:13Z</project.build.outputTimestamp>
         <!-- Passed by maven-release-plugin to its prepare and perform builds. CI runs the tests on the release PR, so these builds only check, package and deploy. A property, not plugin configuration, so -Darguments can override it -->
         <arguments>-DskipTests -DskipITs -Dinvoker.skip</arguments>
 
