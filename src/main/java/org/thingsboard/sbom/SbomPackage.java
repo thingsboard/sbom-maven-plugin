@@ -6,13 +6,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.thingsboard.sbom.BundledComponents.Resolved;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,50 +25,35 @@ public final class SbomPackage {
 
     private SbomPackage() {}
 
-    public static List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
+    public static List<Path> writeAll(Path applicationSbom, Path bundledDirectory, String name, String version, List<PackageFile> packages) {
         List<PackageFile> included = packages.stream().filter(packageFile -> !packageFile.isSkip()).toList();
         if (included.isEmpty()) {
             return List.of();
         }
         JsonNode application = SbomFiles.readFile(applicationSbom);
-        checkApplication(application, components);
-        Map<BundledComponent, Resolved> resolved = new HashMap<>();
         Map<Path, ObjectNode> described = new LinkedHashMap<>();
         for (PackageFile packageFile : included) {
-            described.put(outputFile(packageFile), describe(application, name, version, packageFile, components, resolved));
+            Path bundledFile = SbomBundled.file(bundledDirectory, name, packageFile.getId());
+            check(Files.isRegularFile(bundledFile), "Package " + packageFile.getId() + " has no bundled SBOM " + bundledFile
+                    + "; run the bundled goal before this one, with the same name and packages");
+            described.put(outputFile(packageFile), describe(application, name, version, packageFile, SbomFiles.readFile(bundledFile)));
         }
         described.forEach(SbomFiles::writeFile);
         return List.copyOf(described.keySet());
     }
 
-    public static void checkConfig(List<PackageFile> packages, List<BundledComponent> components) {
+    public static void checkConfig(List<PackageFile> packages) {
         check(packages != null && !packages.isEmpty(), "No packages configured");
         Set<String> ids = new LinkedHashSet<>();
         for (PackageFile packageFile : packages) {
             checkPackage(packageFile);
             check(ids.add(packageFile.getId()), "Package id " + packageFile.getId() + " is used more than once");
         }
-        BundledComponents.validate(components, BundledComponents.Goal.PACKAGE);
-        for (BundledComponent component : components) {
-            for (String id : component.getPackages()) {
-                check(ids.contains(id), "Bundled component " + component.ref() + " refers to unknown package " + id + "; known packages are " + ids);
-            }
-        }
-    }
-
-    public static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, List<BundledComponent> components) {
-        checkApplication(application, components);
-        return describe(application, name, version, packageFile, components, new HashMap<>());
     }
 
     private static Path outputFile(PackageFile packageFile) {
         Path file = packageFile.getFile().toPath();
         return file.resolveSibling(file.getFileName() + SBOM_SUFFIX);
-    }
-
-    private static void checkApplication(JsonNode application, List<BundledComponent> components) {
-        SbomChecks.checkInput("Application", application);
-        BundledComponents.validate(components, BundledComponents.Goal.PACKAGE);
     }
 
     private static void checkPackage(PackageFile packageFile) {
@@ -79,8 +62,11 @@ public final class SbomPackage {
         SbomChecks.checkPurl("Package " + packageFile.getId(), packageFile.getPurl());
     }
 
-    private static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, List<BundledComponent> components,
-                                       Map<BundledComponent, Resolved> resolved) {
+    /**
+     * The SBOM of a package: the application SBOM and the bundled SBOM of the package, under the package as the root.
+     */
+    static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, JsonNode bundled) {
+        SbomChecks.checkInput("Application", application);
         checkPackage(packageFile);
         check(name != null && !name.isBlank(), "Package name is blank");
         check(version != null && !version.isBlank(), "Package version is blank");
@@ -88,21 +74,25 @@ public final class SbomPackage {
         check(Files.isRegularFile(file), "Package file " + file + " does not exist");
         check(size(file) > 0, "Package file " + file + " is empty");
 
+        String specVersion = application.path("specVersion").asText();
+        check(specVersion.equals(bundled.path("specVersion").asText()),
+                "Bundled SBOM of package " + packageFile.getId() + " is CycloneDX " + bundled.path("specVersion").asText() + ", but the application SBOM is " + specVersion);
+        SbomChecks.checkInput("Bundled", bundled);
+        String bundledRoot = SbomChecks.rootRef(bundled);
+        String expectedRoot = SbomBundled.rootRef(name, packageFile.getId(), version);
+        check(bundledRoot.equals(expectedRoot), "Bundled SBOM of package " + packageFile.getId() + " is " + bundledRoot + ", not " + expectedRoot
+                + "; run the bundled goal again, with the same name, version and packages");
+        Map<String, Set<String>> bundledGraph = SbomChecks.dependencyGraph(bundled);
+        Set<String> direct = bundledGraph.getOrDefault(bundledRoot, Set.of());
+
         JsonNode applicationRoot = application.path("metadata").path("component");
         String applicationRef = applicationRoot.path("bom-ref").asText();
         String packageRef = packageFile.getPurl();
-        String specVersion = application.path("specVersion").asText();
-        List<Resolved> included = components.stream()
-                .filter(component -> component.includedIn(packageFile.getId()))
-                .map(component -> resolved.computeIfAbsent(component, key -> BundledComponents.resolve(key, specVersion)))
-                .toList();
         Set<String> existingRefs = SbomChecks.componentRefs(application);
         existingRefs.add(applicationRef);
         check(!existingRefs.contains(packageRef), "Package purl " + packageRef + " is already used by a component of the application SBOM");
-        Set<String> bundledRefs = new HashSet<>();
-        for (Resolved component : included) {
-            check(!existingRefs.contains(component.ref()) && !component.ref().equals(packageRef) && bundledRefs.add(component.ref()),
-                    "Bundled component " + component.ref() + " clashes with a component that is already in the SBOM");
+        for (String ref : direct) {
+            check(!existingRefs.contains(ref) && !ref.equals(packageRef), "Bundled component " + ref + " clashes with a component that is already in the SBOM");
         }
 
         Map<String, String> packageHashes = SbomFiles.hashes(file);
@@ -117,38 +107,28 @@ public final class SbomPackage {
             bomComponents.add(component.deepCopy());
             componentsByRef.put(component.path("bom-ref").asText(), component);
         });
-        for (Resolved component : included) {
-            bomComponents.add(component.json());
-            componentsByRef.put(component.ref(), component.json());
+        String source = "the bundled SBOM of package " + packageFile.getId();
+        for (JsonNode component : bundled.path("components")) {
+            String ref = component.path("bom-ref").asText();
+            check(!ref.equals(packageRef), "Component " + ref + " from " + source + " clashes with a different component that is already in the SBOM");
+            SbomJson.addComponent(bomComponents, componentsByRef, component, source);
         }
-        for (Resolved component : included) {
-            if (component.sbom() == null) {
-                continue;
-            }
-            String source = "the SBOM of " + component.ref();
-            for (JsonNode nested : component.sbom().path("components")) {
-                String ref = nested.path("bom-ref").asText();
-                check(!ref.equals(packageRef), "Component " + ref + " from " + source + " clashes with a different component that is already in the SBOM");
-                SbomJson.addComponent(bomComponents, componentsByRef, nested, source);
-            }
-            SbomMerger.mergeTools(bom, component.sbom());
-        }
+        SbomMerger.mergeTools(bom, bundled);
 
         Map<String, Set<String>> graph = new LinkedHashMap<>();
         Set<String> rootDependsOn = graph.computeIfAbsent(packageRef, ref -> new LinkedHashSet<>());
         rootDependsOn.add(applicationRef);
-        included.forEach(component -> rootDependsOn.add(component.ref()));
+        rootDependsOn.addAll(direct);
         SbomChecks.addDependencies(graph, application);
         graph.computeIfAbsent(applicationRef, ref -> new LinkedHashSet<>());
-        for (Resolved component : included) {
-            graph.computeIfAbsent(component.ref(), ref -> new LinkedHashSet<>());
-            if (component.sbom() != null) {
-                SbomChecks.addDependencies(graph, component.sbom());
+        bundledGraph.forEach((ref, targets) -> {
+            if (!ref.equals(bundledRoot)) {
+                graph.computeIfAbsent(ref, key -> new LinkedHashSet<>()).addAll(targets);
             }
-        }
+        });
         SbomJson.putDependencies(bom, graph);
 
-        checkOutput(application, bom, packageRef, included, graph);
+        checkOutput(application, bundled, bom, packageRef, graph);
         return bom;
     }
 
@@ -183,26 +163,20 @@ public final class SbomPackage {
         return root;
     }
 
-    private static void checkOutput(JsonNode application, ObjectNode bom, String packageRef, List<Resolved> included, Map<String, Set<String>> graph) {
+    private static void checkOutput(JsonNode application, JsonNode bundled, ObjectNode bom, String packageRef, Map<String, Set<String>> graph) {
         SbomChecks.checkInput("Package", bom);
         check(SbomChecks.rootRef(bom).equals(packageRef), "Package SBOM root is not the package");
         Set<String> expected = new LinkedHashSet<>();
         expected.add(SbomChecks.rootRef(application));
         expected.addAll(SbomChecks.componentRefs(application));
-        included.forEach(component -> expected.add(component.ref()));
-        included.stream().filter(component -> component.sbom() != null).forEach(component -> expected.addAll(SbomChecks.componentRefs(component.sbom())));
+        expected.addAll(SbomChecks.componentRefs(bundled));
         check(SbomChecks.componentRefs(bom).equals(expected), "Package SBOM components are not the application, its components and the bundled components");
 
         Set<String> packageReachable = SbomChecks.reachableFrom(packageRef, graph);
         Set<String> lost = SbomChecks.unreachable(SbomChecks.reachableFrom(SbomChecks.rootRef(application), SbomChecks.dependencyGraph(application)), packageReachable);
         check(lost.isEmpty(), "Package SBOM lost dependency paths to " + lost);
-        for (Resolved component : included) {
-            check(packageReachable.contains(component.ref()), "Bundled component " + component.ref() + " is not reachable from the package");
-            if (component.sbom() != null) {
-                Set<String> unreachable = SbomChecks.unreachable(SbomChecks.componentRefs(component.sbom()), packageReachable);
-                check(unreachable.isEmpty(), "Components from the SBOM of " + component.ref() + " are not reachable from the package: " + unreachable);
-            }
-        }
+        Set<String> unreachable = SbomChecks.unreachable(SbomChecks.componentRefs(bundled), packageReachable);
+        check(unreachable.isEmpty(), "Bundled components are not reachable from the package: " + unreachable);
     }
 
     private static long size(Path file) {

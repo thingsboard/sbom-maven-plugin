@@ -93,7 +93,7 @@ class CycloneDxCliValidationIT {
                 new BundledComponent("data", "lwm2m-registry", null, registry.toFile()),
                 new BundledComponent("cryptographic-asset", "DigiCert Global Root G2", null, certificate.toFile()));
 
-        ObjectNode described = SbomPackage.describe(SbomPackageTest.application(), "thingsboard", "4.4.0.1",
+        ObjectNode described = SbomPackageTest.describe(SbomPackageTest.application(), "thingsboard", "4.4.0.1",
                 new PackageFile("deb", deb.toFile(), SbomPackageTest.DEB_PURL, false), components);
 
         CliResult result = validate(described);

@@ -30,4 +30,14 @@ assert !new File(basedir, 'dist/app.rpm.cdx.json').exists()
 def log = new File(basedir, 'build.log').text
 assert log.contains('Skipping package SBOM for rpm')
 assert log.contains('Wrote package SBOM ')
+
+// The bundled goal ran first and wrote what each package bundles, which the package goal added
+def bundledDeb = new JsonSlurper().parse(new File(basedir, 'target/sbom/app-deb.bundled.cdx.json'))
+assert bundledDeb.metadata.component.'bom-ref' == 'app-deb-bundled@1.0.0'
+assert bundledDeb.components*.'bom-ref'.toSet() == ['extension@1.0.0', widgetRef, 'pkg:npm/charts@1.0.0', 'registry', 'Root CA'].toSet()
+def bundledZip = new JsonSlurper().parse(new File(basedir, 'target/sbom/app-zip.bundled.cdx.json'))
+assert bundledZip.components*.'bom-ref'.contains('pkg:maven/com.example/service-wrapper@2.0.1?type=exe')
+assert !new File(basedir, 'target/sbom/app-rpm.bundled.cdx.json').exists()
+assert log.contains('Skipping bundled SBOM for rpm')
+assert log.indexOf('Wrote bundled SBOM ') < log.indexOf('Wrote package SBOM ')
 true

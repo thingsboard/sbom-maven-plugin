@@ -4,7 +4,8 @@ Maven plugin that makes the CycloneDX SBOMs of what a Maven build ships:
 
 - `jar` makes the SBOM of a jar that packs its libraries, such as a Spring Boot jar, from the finished jar, and puts it into the jar.
 - `metadata` sets who makes and supplies the software and the SBOM, in an SBOM made by another tool.
-- `package` writes one SBOM per distribution package (`.deb`, `.rpm`, `.zip`), next to the package file.
+- `bundled` writes, before the packages are built, the SBOM of what each distribution package bundles besides the application: the components the build declares.
+- `package` writes one SBOM per distribution package (`.deb`, `.rpm`, `.zip`), next to the package file: the application SBOM and the bundled SBOM of the package.
 - `image` writes the SBOM of every architecture of a pushed Docker image and attaches it to the image: what Syft finds in the image, with the parts we built replaced by our own SBOMs.
 
 ThingsBoard uses it to make the SBOM of every Spring Boot jar it ships, with the npm SBOM of the Angular UI (`ui-ngx`) folded into the SBOM of the server application. The result is one SBOM per shipped artifact, with the npm packages attached to the `ui-ngx` component in the dependency graph.
@@ -119,22 +120,23 @@ Each of the first three is an organization with a `name`, optional `urls` and op
 
 The build fails, and the file is left untouched, when nothing is configured, the timestamp is not a date and time with an offset, an organization has no name, a url is blank, a contact is empty, the SBOM is older than CycloneDX 1.6, the input or the result fails schema validation, or anything other than these fields would change.
 
-## package goal
+## bundled goal
 
 ```xml
 <execution>
-    <id>package-sbom</id>
+    <id>bundled-sbom</id>
     <goals>
-        <goal>package</goal>
+        <goal>bundled</goal>
     </goals>
     <configuration>
         <name>thingsboard</name>
         <packages>
             <package>
                 <id>deb</id>
-                <file>${project.build.directory}/thingsboard.deb</file>
-                <purl>pkg:deb/thingsboard/thingsboard@${project.version}-1?arch=all</purl>
                 <skip>false</skip>
+            </package>
+            <package>
+                <id>zip</id>
             </package>
         </packages>
         <components>
@@ -164,24 +166,63 @@ The build fails, and the file is left untouched, when nothing is configured, the
 </execution>
 ```
 
-The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
+The `bundled` goal runs at `prepare-package` by default: before the packages are built, once the files of the components are in place. What is made before the packages can then read what they bundle, such as third-party notices that go into them. For each package that is not skipped it writes `<outputDirectory>/<name>-<package id>.bundled.cdx.json`, once every package has been checked, also when the package bundles nothing:
+
+- The root component (`metadata.component`) is `<name>-<package id>-bundled` with the configured `version`; its `bom-ref` is `<name>-<package id>-bundled@<version>`. It depends on every component the package bundles.
+- Each bundled component the package contains is added. A file gets its SHA-256 and SHA-512; a directory gets no hashes. A `cryptographic-asset` must point to an X.509 certificate, whose subject, issuer and validity are added as `cryptoProperties`.
+- A bundled component with an `sbom` takes everything from that SBOM instead of the configuration: its root becomes the component, and its components and dependencies are added under it. The SBOM must give the SHA-256 of `file`, and it must match the file being packaged, so a file copied without its SBOM, or with an SBOM from another build, fails the build. Its tools are added to `metadata.tools`.
+- The SBOM is CycloneDX 1.6. The `serialNumber` is derived from the root and the components.
+
+| Parameter | Property | Default | Description |
+| --- | --- | --- | --- |
+| `packages` | | required | Packages: `id`, optional `skip`. A `file` and a `purl` are allowed, so the list can be the same as for the `package` goal, but not needed |
+| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (an SPDX license expression such as `MIT` or `EPL-2.0 OR BSD-3-Clause`; the build fails on anything else), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
+| `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component, as for the `package` goal |
+| `version` | `sbom.package.version` | `${project.version}` | Version of the package component, as for the `package` goal |
+| `outputDirectory` | `sbom.bundled.directory` | `${project.build.directory}/sbom` | Directory to write the bundled SBOMs to |
+| `skip` | `sbom.bundled.skip` | `false` | Skip all packages |
+
+The build fails, and no bundled SBOM is written, when there are no packages, package ids repeat or one is blank, a bundled component has no name, is declared twice, has an `sbom` together with details of its own or without a `file`, sets `installDir` or `bundleDir`, still contains an unresolved `${...}` property, has a supplier without name or with a blank url, has an `sbom` that is invalid, uses another spec version, has components its root does not depend on, or does not match the file's hashes, refers to an unknown package id, points to a missing file or an empty directory, a `cryptographic-asset` is not an X.509 certificate, a `cpe` does not start with `cpe:2.3:` or `cpe:/`, or the result fails schema validation.
+
+## package goal
+
+```xml
+<execution>
+    <id>package-sbom</id>
+    <goals>
+        <goal>package</goal>
+    </goals>
+    <configuration>
+        <name>thingsboard</name>
+        <packages>
+            <package>
+                <id>deb</id>
+                <file>${project.build.directory}/thingsboard.deb</file>
+                <purl>pkg:deb/thingsboard/thingsboard@${project.version}-1?arch=all</purl>
+                <skip>false</skip>
+            </package>
+        </packages>
+    </configuration>
+</execution>
+```
+
+The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. It needs the bundled SBOM of every package, which the `bundled` goal writes with the same `name`, `version` and packages. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
 
 - The package is the root component (`metadata.component`): the configured `name`, `version` and `purl`, the SHA-256 and SHA-512 of the package file, and the description, licenses, manufacturer and website of the application.
 - The application SBOM's root and all its components and dependencies are kept unchanged; the package depends on the application.
-- Each bundled component the package contains is added, and the package depends on it. A file gets its SHA-256 and SHA-512; a directory gets no hashes. A `cryptographic-asset` must point to an X.509 certificate, whose subject, issuer and validity are added as `cryptoProperties`.
-- A bundled component with an `sbom` takes everything from that SBOM instead of the configuration: its root becomes the component, and its components and dependencies are added under it. The SBOM must give the SHA-256 of `file`, and it must match the file being packaged, so a file copied without its SBOM, or with an SBOM from another build, fails the build. Components already in the application SBOM with the same `bom-ref` and `purl` are not added twice. Its tools are added to `metadata.tools`.
+- The components of the bundled SBOM of the package and their dependencies are added, and the package depends on what the root of the bundled SBOM depends on. Components already in the application SBOM with the same `bom-ref` and `purl` are not added twice. Its tools are added to `metadata.tools`.
 - `metadata.tools`, `lifecycles`, `manufacturer` and `supplier` are copied from the application SBOM. The `serialNumber` is derived from the package purl and contents.
 
 | Parameter | Property | Default | Description |
 | --- | --- | --- | --- |
 | `packages` | | required | Packages to describe: `id`, `file`, `purl`, optional `skip` |
-| `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (an SPDX license expression such as `MIT` or `EPL-2.0 OR BSD-3-Clause`; the build fails on anything else), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
 | `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component |
 | `version` | `sbom.package.version` | `${project.version}` | Version of the package component |
 | `sourceFile` | `sbom.package.sourceFile` | `${project.build.directory}/sbom/application.cdx.json` | Application SBOM to start from: by default the one the `jar` goal writes |
+| `bundledDirectory` | `sbom.bundled.directory` | `${project.build.directory}/sbom` | Directory with the bundled SBOMs that the `bundled` goal writes |
 | `skip` | `sbom.package.skip` | `false` | Skip all packages |
 
-The build fails, and no package SBOM is written, when package ids repeat, a package has no purl or an invalid one, a package file is missing or empty, a bundled component has no name, is declared twice, has an `sbom` together with details of its own or without a `file`, sets `installDir` or `bundleDir`, still contains an unresolved `${...}` property, has a supplier without name or with a blank url, has an `sbom` that is invalid, uses another spec version, has components its root does not depend on, or does not match the file's hashes, refers to an unknown package id, points to a missing file or an empty directory, or clashes with a component already in the SBOM, a `cryptographic-asset` is not an X.509 certificate, a `cpe` does not start with `cpe:2.3:` or `cpe:/`, or the result fails schema validation or loses a dependency path of the application.
+The build fails, and no package SBOM is written, when package ids repeat, a package has no purl or an invalid one, a package file is missing or empty, a package has no bundled SBOM, or one of another package, name or version, or one with another spec version than the application SBOM, a bundled component clashes with a component already in the SBOM, or the result fails schema validation or loses a dependency path of the application.
 
 ## image goal
 

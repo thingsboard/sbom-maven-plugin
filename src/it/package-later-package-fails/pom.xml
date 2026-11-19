@@ -43,9 +43,9 @@
                 <version>@project.version@</version>
                 <executions>
                     <execution>
-                        <id>package-sbom</id>
+                        <id>bundled-sbom</id>
                         <goals>
-                            <goal>package</goal>
+                            <goal>bundled</goal>
                         </goals>
                         <configuration>
                             <name>app</name>
@@ -103,6 +103,34 @@
                                     </packages>
                                 </component>
                             </components>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>package-sbom</id>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
+                        <configuration>
+                            <name>app</name>
+                            <version>1.0.0</version>
+                            <packages>
+                                <package>
+                                    <id>deb</id>
+                                    <file>${project.basedir}/dist/app.deb</file>
+                                    <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
+                                </package>
+                                <package>
+                                    <id>rpm</id>
+                                    <file>${project.basedir}/dist/app.rpm</file>
+                                    <purl>pkg:rpm/example/app@1.0.0-1?arch=noarch</purl>
+                                    <skip>true</skip>
+                                </package>
+                                <package>
+                                    <id>zip</id>
+                                    <file>${project.basedir}/dist/app-windows.zip</file>
+                                    <purl>pkg:generic/example/app-windows@1.0.0</purl>
+                                </package>
+                            </packages>
                         </configuration>
                     </execution>
                 </executions>

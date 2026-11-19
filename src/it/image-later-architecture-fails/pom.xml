@@ -43,6 +43,23 @@
                 <version>@project.version@</version>
                 <executions>
                     <execution>
+                        <id>bundled-sbom</id>
+                        <goals>
+                            <goal>bundled</goal>
+                        </goals>
+                        <configuration>
+                            <name>app</name>
+                            <version>1.0.0</version>
+                            <packages>
+                                <package>
+                                    <id>deb</id>
+                                    <file>${project.basedir}/dist/app.deb</file>
+                                    <purl>pkg:deb/example/app@1.0.0-1?arch=all</purl>
+                                </package>
+                            </packages>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>package-sbom</id>
                         <goals>
                             <goal>package</goal>

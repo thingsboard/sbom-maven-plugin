@@ -74,8 +74,22 @@ class SbomPackageTest {
                         .group("com.sun.winsw").purl("pkg:maven/com.sun.winsw/winsw@2.0.1?classifier=bin&type=exe").packages(List.of("zip")));
     }
 
+    static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, List<BundledComponent> components) {
+        return SbomPackage.describe(application, name, version, packageFile, SbomBundled.describe(name, version, packageFile.getId(), components));
+    }
+
+    static void checkConfig(List<PackageFile> packages, List<BundledComponent> components) {
+        SbomPackage.checkConfig(packages);
+        SbomBundled.checkConfig(packages, components);
+    }
+
+    List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
+        SbomBundled.writeAll(tempDir.resolve("sbom"), name, version, packages, components);
+        return SbomPackage.writeAll(applicationSbom, tempDir.resolve("sbom"), name, version, packages);
+    }
+
     ObjectNode describeDeb() {
-        return SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), bundled());
+        return describe(application(), "thingsboard", "4.4.0.1", debPackage(), bundled());
     }
 
     @Test
@@ -165,7 +179,7 @@ class SbomPackageTest {
         List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile())
                 .purl("pkg:generic/chromium@139.0.7258.5?os=linux").cpe("cpe:2.3:a:google:chrome:139.0.7258.5:*:*:*:*:*:*:*"));
 
-        JsonNode described = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
+        JsonNode described = describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
 
         assertThat(component(described, "pkg:generic/chromium@139.0.7258.5?os=linux").path("cpe").asText())
                 .isEqualTo("cpe:2.3:a:google:chrome:139.0.7258.5:*:*:*:*:*:*:*");
@@ -175,7 +189,7 @@ class SbomPackageTest {
     void failsOnAnInvalidCpe() {
         List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).cpe("google chrome"));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Bundled component chromium@139.0.7258.5 has an invalid cpe google chrome");
     }
@@ -185,7 +199,7 @@ class SbomPackageTest {
         List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile())
                 .purl("pkg:generic/chromium@139.0.7258.5?os=linux").license("bsd-3-clause and mit"));
 
-        JsonNode described = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
+        JsonNode described = describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
 
         assertThat(component(described, "pkg:generic/chromium@139.0.7258.5?os=linux").path("licenses").path(0).path("expression").asText())
                 .isEqualTo("BSD-3-Clause AND MIT");
@@ -195,7 +209,7 @@ class SbomPackageTest {
     void failsOnALicenseThatIsNotAnSpdxExpression() {
         List<BundledComponent> components = List.of(new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).license("BSD 3"));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Bundled component chromium@139.0.7258.5 has the license 'BSD 3', which is not an SPDX license expression");
     }
@@ -206,9 +220,9 @@ class SbomPackageTest {
                 new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).purl("pkg:generic/chromium@139.0.7258.5?os=linux").packages(List.of("deb")),
                 new BundledComponent("application", "chromium", "139.0.7258.5", bundle.toFile()).purl("pkg:generic/chromium@139.0.7258.5?os=windows").packages(List.of("zip")));
 
-        SbomPackage.checkConfig(List.of(debPackage(), zipPackage()), components);
-        JsonNode deb = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
-        JsonNode windows = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", zipPackage(), components);
+        checkConfig(List.of(debPackage(), zipPackage()), components);
+        JsonNode deb = describe(application(), "thingsboard", "4.4.0.1", debPackage(), components);
+        JsonNode windows = describe(application(), "thingsboard", "4.4.0.1", zipPackage(), components);
 
         assertThat(SbomChecks.componentRefs(deb)).contains("pkg:generic/chromium@139.0.7258.5?os=linux").doesNotContain("pkg:generic/chromium@139.0.7258.5?os=windows");
         assertThat(SbomChecks.componentRefs(windows)).contains("pkg:generic/chromium@139.0.7258.5?os=windows").doesNotContain("pkg:generic/chromium@139.0.7258.5?os=linux");
@@ -244,7 +258,7 @@ class SbomPackageTest {
 
     @Test
     void aComponentLimitedToThisPackageIsIncludedWithItsPurlAsRef() {
-        JsonNode described = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", zipPackage(), bundled());
+        JsonNode described = describe(application(), "thingsboard", "4.4.0.1", zipPackage(), bundled());
 
         JsonNode winsw = component(described, "pkg:maven/com.sun.winsw/winsw@2.0.1?classifier=bin&type=exe");
         assertThat(winsw.path("group").asText()).isEqualTo("com.sun.winsw");
@@ -254,7 +268,7 @@ class SbomPackageTest {
 
     @Test
     void worksWithoutBundledComponents() {
-        JsonNode described = SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), List.of());
+        JsonNode described = describe(application(), "thingsboard", "4.4.0.1", debPackage(), List.of());
 
         assertThat(Boms.graph(described).get(DEB_PURL)).containsExactly(APP_REF);
         assertThat(described.path("components")).hasSize(application().path("components").size() + 1);
@@ -290,7 +304,7 @@ class SbomPackageTest {
     void inputIsNotModified() {
         ObjectNode application = application();
 
-        SbomPackage.describe(application, "thingsboard", "4.4.0.1", debPackage(), bundled());
+        describe(application, "thingsboard", "4.4.0.1", debPackage(), bundled());
 
         assertThat(application).isEqualTo(application());
     }
@@ -299,7 +313,7 @@ class SbomPackageTest {
     void writesTheSbomNextToThePackage() throws IOException {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
 
-        Path output = SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()).get(0);
+        Path output = writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()).get(0);
 
         assertThat(output).isEqualTo(tempDir.resolve("thingsboard.deb.cdx.json"));
         assertThat(Boms.MAPPER.readTree(output.toFile())).isEqualTo(describeDeb());
@@ -310,7 +324,7 @@ class SbomPackageTest {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         Files.delete(bundle);
 
-        assertThatThrownBy(() -> SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()))
+        assertThatThrownBy(() -> writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()))
                 .isInstanceOf(SbomException.class);
 
         assertThat(tempDir.resolve("thingsboard.deb.cdx.json")).doesNotExist();
@@ -321,7 +335,7 @@ class SbomPackageTest {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         PackageFile skippedZip = new PackageFile("zip", zip.toFile(), "pkg:generic/thingsboard/thingsboard-windows@4.4.0.1", true);
 
-        List<Path> outputs = SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), skippedZip), List.of());
+        List<Path> outputs = writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), skippedZip), List.of());
 
         assertThat(outputs).containsExactly(tempDir.resolve("thingsboard.deb.cdx.json"));
         assertThat(tempDir.resolve("thingsboard-windows.zip.cdx.json")).doesNotExist();
@@ -331,7 +345,7 @@ class SbomPackageTest {
     void doesNotReadTheApplicationSbomWhenEveryPackageIsSkipped() {
         PackageFile skippedDeb = new PackageFile("deb", deb.toFile(), DEB_PURL, true);
 
-        List<Path> outputs = SbomPackage.writeAll(tempDir.resolve("missing.cdx.json"), "thingsboard", "4.4.0.1", List.of(skippedDeb), bundled());
+        List<Path> outputs = writeAll(tempDir.resolve("missing.cdx.json"), "thingsboard", "4.4.0.1", List.of(skippedDeb), bundled());
 
         assertThat(outputs).isEmpty();
     }
@@ -341,7 +355,7 @@ class SbomPackageTest {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         Files.delete(zip);
 
-        assertThatThrownBy(() -> SbomPackage.writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), zipPackage()), List.of()))
+        assertThatThrownBy(() -> writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage(), zipPackage()), List.of()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("thingsboard-windows.zip does not exist");
 
@@ -353,7 +367,7 @@ class SbomPackageTest {
         List<BundledComponent> components = List.of(new BundledComponent("library", "extension", "1.0", bundle.toFile())
                 .supplier(new Organization("Example, Inc.", List.of(" "), List.of())));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Supplier of bundled component extension@1.0 has a blank url");
     }
@@ -363,7 +377,7 @@ class SbomPackageTest {
         List<BundledComponent> components = List.of(new BundledComponent("library", "extension", "1.0", bundle.toFile())
                 .supplier(new Organization("${vendor}", List.of(), List.of())));
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), components))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Bundled component extension@1.0 has the unresolved property in ${vendor}");
     }
@@ -408,7 +422,7 @@ class SbomPackageTest {
     void failsWhenACertificateFileIsNotACertificate() {
         List<BundledComponent> components = List.of(new BundledComponent("cryptographic-asset", "not a certificate", null, bundle.toFile()));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("which is not an X.509 certificate");
     }
@@ -417,7 +431,7 @@ class SbomPackageTest {
     void failsWhenACertificateHasNoFile() {
         List<BundledComponent> components = List.of(new BundledComponent("cryptographic-asset", "no file", null, null));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("needs a certificate file");
     }
@@ -427,7 +441,7 @@ class SbomPackageTest {
         String existing = Boms.mavenFixture().path("components").get(0).path("purl").asText();
         List<BundledComponent> components = List.of(new BundledComponent("library", "clash", "1.0", bundle.toFile()).purl(existing));
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", debPackage(), components))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("clashes with a component that is already in the SBOM");
     }
@@ -436,7 +450,7 @@ class SbomPackageTest {
     void failsWhenThePackagePurlIsUsedByTheApplication() {
         PackageFile clash = new PackageFile("deb", deb.toFile(), APP_REF, false);
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", clash, bundled()))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", clash, bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("is already used by a component of the application SBOM");
     }
@@ -445,14 +459,14 @@ class SbomPackageTest {
     void failsOnAnInvalidPurl() {
         PackageFile invalid = new PackageFile("deb", deb.toFile(), "thingsboard.deb", false);
 
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", invalid, bundled()))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", "4.4.0.1", invalid, bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Package deb has an invalid purl thingsboard.deb");
     }
 
     @Test
     void failsOnABlankVersion() {
-        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", " ", debPackage(), bundled()))
+        assertThatThrownBy(() -> describe(application(), "thingsboard", " ", debPackage(), bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Package version is blank");
     }
@@ -462,26 +476,26 @@ class SbomPackageTest {
         ObjectNode broken = application();
         broken.put("bomFormat", "SPDX");
 
-        assertThatThrownBy(() -> SbomPackage.describe(broken, "thingsboard", "4.4.0.1", debPackage(), bundled()))
+        assertThatThrownBy(() -> describe(broken, "thingsboard", "4.4.0.1", debPackage(), bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Application SBOM is not a CycloneDX document");
     }
 
     @Test
     void configCheckAcceptsAValidConfiguration() {
-        SbomPackage.checkConfig(List.of(debPackage(), zipPackage()), bundled());
+        checkConfig(List.of(debPackage(), zipPackage()), bundled());
     }
 
     @Test
     void configCheckRejectsDuplicatePackageIds() {
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage(), debPackage()), bundled()))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage(), debPackage()), bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Package id deb is used more than once");
     }
 
     @Test
     void configCheckRejectsAComponentForAnUnknownPackage() {
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), bundled()))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("refers to unknown package zip");
     }
@@ -492,7 +506,7 @@ class SbomPackageTest {
                 new BundledComponent("library", "same", "1.0", bundle.toFile()),
                 new BundledComponent("library", "same", "1.0", bundle.toFile()));
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), twice))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), twice))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Bundled component same@1.0 is declared more than once");
     }
@@ -501,7 +515,7 @@ class SbomPackageTest {
     void configCheckRejectsAComponentWithoutName() {
         List<BundledComponent> unnamed = List.of(new BundledComponent("library", " ", "1.0", bundle.toFile()));
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), unnamed))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), unnamed))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("A bundled component has no name");
     }
@@ -510,16 +524,54 @@ class SbomPackageTest {
     void configCheckRejectsAPackageWithoutPurl() {
         PackageFile noPurl = new PackageFile("deb", deb.toFile(), null, false);
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(noPurl), List.of()))
+        assertThatThrownBy(() -> checkConfig(List.of(noPurl), List.of()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Package deb has no purl");
     }
 
     @Test
     void configCheckRejectsAnEmptyPackageList() {
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(), List.of()))
+        assertThatThrownBy(() -> checkConfig(List.of(), List.of()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("No packages configured");
+    }
+
+    @Test
+    void failsWhenThePackageHasNoBundledSbom() throws IOException {
+        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
+
+        assertThatThrownBy(() -> SbomPackage.writeAll(applicationSbom, tempDir.resolve("sbom"), "thingsboard", "4.4.0.1", List.of(debPackage())))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Package deb has no bundled SBOM " + tempDir.resolve("sbom/thingsboard-deb.bundled.cdx.json"))
+                .hasMessageContaining("run the bundled goal before this one");
+    }
+
+    @Test
+    void failsWhenTheBundledSbomIsOfAnotherVersion() {
+        ObjectNode bundled = SbomBundled.describe("thingsboard", "4.4.0.0", "deb", bundled());
+
+        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), bundled))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled SBOM of package deb is thingsboard-deb-bundled@4.4.0.0, not thingsboard-deb-bundled@4.4.0.1");
+    }
+
+    @Test
+    void failsWhenTheBundledSbomIsOfAnotherPackage() {
+        ObjectNode bundled = SbomBundled.describe("thingsboard", "4.4.0.1", "zip", bundled());
+
+        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), bundled))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("is thingsboard-zip-bundled@4.4.0.1, not thingsboard-deb-bundled@4.4.0.1");
+    }
+
+    @Test
+    void failsWhenTheBundledSbomUsesAnotherSpecVersion() {
+        ObjectNode bundled = SbomBundled.describe("thingsboard", "4.4.0.1", "deb", bundled());
+        bundled.put("specVersion", "1.5");
+
+        assertThatThrownBy(() -> SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), bundled))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("is CycloneDX 1.5, but the application SBOM is 1.6");
     }
 
     static final String EXTENSION_REF = "pkg:github/thingsboard/gateway-management-extensions@a12065d71896d3da95d4d1001c8269bf31d90f24";
@@ -548,7 +600,7 @@ class SbomPackageTest {
     }
 
     ObjectNode describeDebWith(BundledComponent component) {
-        return SbomPackage.describe(application(), "thingsboard", "4.4.0.1", debPackage(), List.of(component));
+        return describe(application(), "thingsboard", "4.4.0.1", debPackage(), List.of(component));
     }
 
     @Test
@@ -662,7 +714,7 @@ class SbomPackageTest {
     void configCheckRejectsAComponentSbomWithDetailsOfItsOwn() throws IOException {
         BundledComponent component = extension(extensionSbom()).license("MIT");
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), List.of(component)))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), List.of(component)))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("takes its details from its SBOM and must not set [license]");
     }
@@ -671,7 +723,7 @@ class SbomPackageTest {
     void configCheckRejectsImageOnlyDirectories() {
         BundledComponent component = new BundledComponent("library", "app", "1.0", bundle.toFile()).installDir("/usr/share/app");
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), List.of(component)))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), List.of(component)))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("sets installDir or bundleDir, which only apply to image SBOMs");
     }
@@ -680,7 +732,7 @@ class SbomPackageTest {
     void configCheckRejectsAComponentSbomWithoutFile() {
         BundledComponent component = new BundledComponent("library", null, null, null).sbom(tempDir.resolve("extension.cdx.json").toFile());
 
-        assertThatThrownBy(() -> SbomPackage.checkConfig(List.of(debPackage()), List.of(component)))
+        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), List.of(component)))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("has an SBOM but no file to check it against");
     }
