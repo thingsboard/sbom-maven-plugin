@@ -50,7 +50,7 @@ step "Opening the release PR"
 # --no-follow-tags: the release tag must not reach GitHub before the PR is merged
 git push --no-follow-tags origin "$branch:refs/heads/$pr_branch" \
     || die "pushing $pr_branch failed; nothing is published: see \"Releasing\" in README.md to start over"
-pr_url=$(gh pr create --base main --head "$pr_branch" --title "chore: release $tag" \
+pr_url=$(gh pr create --base main --head "$pr_branch" --title "chore: release $tag" --label release \
     --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.") \
     || die "opening the PR for $pr_branch failed; nothing is published: open it by hand, or see \"Releasing\" in README.md to start over"
 echo "$pr_url"

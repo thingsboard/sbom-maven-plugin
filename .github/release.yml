@@ -1,0 +1,6 @@
+# The notes that GitHub generates for a release. A release PR is merged after its tag, so without this the notes of
+# each release would list the release PR of the one before it.
+changelog:
+  exclude:
+    labels:
+      - release

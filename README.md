@@ -332,7 +332,7 @@ Every release is marked twice on GitHub, and neither mark is ever deleted or mov
 The next development version is optional and defaults to the next patch version. The script stops at the first failure, and:
 
 1. Runs `release:prepare` on a new local `release/1.0.0` branch, without pushing. It commits `1.0.0`, with `project.build.outputTimestamp` set to the current time, tags that commit `v1.0.0`, then commits `1.0.1-SNAPSHOT`.
-2. Pushes the branch as `chore/release-1.0.0`, opens a PR from it and waits for its checks.
+2. Pushes the branch as `chore/release-1.0.0`, opens a PR from it and waits for its checks. The PR has the label `release`, which keeps it out of the generated release notes (`.github/release.yml`): it is merged after its tag, so the notes of the next release would list it.
 3. Merges the PR once the checks pass. `main` takes only merge commits, so the tagged commit stays in its history; GitHub then deletes `chore/release-1.0.0`.
 4. Pushes the tag and the `release/1.0.0` branch, then runs `release:perform`: builds the tag in `target/checkout` and deploys it.
 5. Creates the GitHub Release `v1.0.0` with generated notes and the plugin jar.
