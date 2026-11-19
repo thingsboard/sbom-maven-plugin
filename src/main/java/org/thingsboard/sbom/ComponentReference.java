@@ -6,14 +6,14 @@ package org.thingsboard.sbom;
  * A CycloneDX external reference of a bundled component: a {@code type} of the specification, such as {@code license}
  * for its license file, and the {@code url} where it is.
  */
-public class ExternalReference {
+public class ComponentReference {
 
     private String type;
     private String url;
 
-    public ExternalReference() {}
+    public ComponentReference() {}
 
-    ExternalReference(String type, String url) {
+    ComponentReference(String type, String url) {
         this.type = type;
         this.url = url;
     }

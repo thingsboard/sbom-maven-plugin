@@ -80,7 +80,7 @@ class SbomBundledTest {
     @Test
     void aComponentKeepsItsExternalReferences() throws IOException {
         List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null).license("MIT")
-                .externalReferences(List.of(new ExternalReference("license", "https://raw.githubusercontent.com/nodejs/node/v22.23.4/LICENSE"))));
+                .externalReferences(List.of(new ComponentReference("license", "https://raw.githubusercontent.com/nodejs/node/v22.23.4/LICENSE"))));
 
         ObjectNode bom = SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components);
 
@@ -92,7 +92,7 @@ class SbomBundledTest {
     @Test
     void anExternalReferenceNeedsATypeAndAUrl() {
         List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null)
-                .externalReferences(List.of(new ExternalReference("license", " "))));
+                .externalReferences(List.of(new ComponentReference("license", " "))));
 
         assertThatThrownBy(() -> SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components))
                 .isInstanceOf(SbomException.class)
@@ -102,7 +102,7 @@ class SbomBundledTest {
     @Test
     void anExternalReferenceOfAnUnknownTypeFails() {
         List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null)
-                .externalReferences(List.of(new ExternalReference("licence", "https://nodejs.org"))));
+                .externalReferences(List.of(new ComponentReference("licence", "https://nodejs.org"))));
 
         assertThatThrownBy(() -> SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components))
                 .isInstanceOf(SbomException.class)

@@ -41,7 +41,8 @@ public class BundledMojo extends SbomMojo {
 
     /**
      * Bundled components: {@code type} (default {@code library}), {@code group}, {@code name}, {@code version},
-     * {@code description}, {@code purl}, {@code cpe}, {@code license} (an SPDX expression, or the build fails), {@code supplier}, {@code file},
+     * {@code description}, {@code purl}, {@code cpe}, {@code license} (an SPDX expression, or the build fails), {@code supplier},
+     * {@code externalReferences} ({@code type}, one of the CycloneDX types such as {@code license}, and {@code url}), {@code file},
      * {@code sbom} (CycloneDX SBOM of {@code file}; replaces all the other details) and {@code packages}
      * (ids of the packages that contain it; all when empty).
      */

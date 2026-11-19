@@ -21,7 +21,7 @@ public class BundledComponent {
     private String cpe;
     private String license;
     private Organization supplier;
-    private List<ExternalReference> externalReferences = new ArrayList<>();
+    private List<ComponentReference> externalReferences = new ArrayList<>();
     private File file;
     private File sbom;
     private String installDir;
@@ -85,7 +85,7 @@ public class BundledComponent {
         return this;
     }
 
-    BundledComponent externalReferences(List<ExternalReference> externalReferences) {
+    BundledComponent externalReferences(List<ComponentReference> externalReferences) {
         this.externalReferences = externalReferences;
         return this;
     }
@@ -146,7 +146,7 @@ public class BundledComponent {
         return supplier;
     }
 
-    public List<ExternalReference> getExternalReferences() {
+    public List<ComponentReference> getExternalReferences() {
         return externalReferences == null ? List.of() : externalReferences;
     }
 

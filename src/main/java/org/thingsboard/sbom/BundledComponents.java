@@ -182,7 +182,7 @@ final class BundledComponents {
                     "Bundled component " + component.ref() + " has an invalid cpe " + component.getCpe());
             json.put("cpe", component.getCpe());
         }
-        for (ExternalReference reference : component.getExternalReferences()) {
+        for (ComponentReference reference : component.getExternalReferences()) {
             check(reference.getType() != null && !reference.getType().isBlank() && reference.getUrl() != null && !reference.getUrl().isBlank(),
                     "Bundled component " + component.ref() + " has an external reference without a type or a url");
             json.withArray("externalReferences").addObject().put("url", reference.getUrl()).put("type", reference.getType());
