@@ -18,8 +18,7 @@ die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 [ $# -ge 1 ] && [ $# -le 2 ] || die "usage: $0 <release version> [<next development version>]"
 readonly version=$1 next_version=${2:-}
-# Every release is marked by the tag and by the release branch, which GitHub keeps from being deleted or moved. The PR
-# goes out from a branch of its own, so that a release that stops before it is merged leaves nothing that stays.
+# release/<version> can never be deleted or moved on GitHub: push it only after the merge, and open the PR from $pr_branch
 readonly tag=v$version branch=release/$version pr_branch=chore/release-$version
 
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "release version must look like 1.2.3, got '$version'"
@@ -49,7 +48,7 @@ git log --oneline -2
 
 step "Opening the release PR"
 # --no-follow-tags: the release tag must not reach GitHub before the PR is merged
-git push --no-follow-tags --set-upstream origin "$branch:refs/heads/$pr_branch" \
+git push --no-follow-tags origin "$branch:refs/heads/$pr_branch" \
     || die "pushing $pr_branch failed; nothing is published: see \"Releasing\" in README.md to start over"
 pr_url=$(gh pr create --base main --head "$pr_branch" --title "chore: release $tag" \
     --body "Release commit tagged $tag, followed by the commit that starts the next development version. Created by release.sh.") \
@@ -74,8 +73,8 @@ gh pr merge "$pr_url" --merge \
 step "Pushing $tag and $branch"
 git fetch --quiet origin main || die "fetching main failed: finish the release by hand: see \"Releasing\" in README.md"
 git merge-base --is-ancestor "$branch" origin/main \
-    || die "$branch is not in main's history (was the PR squashed or rebased?): do not push $tag or $branch; delete the local $tag tag and $branch branch, then run release.sh again"
-git push origin "refs/tags/$tag" "$branch:refs/heads/$branch" \
+    || die "$branch is not in main's history (was the PR squashed or rebased?): push nothing; delete the local $tag tag and $branch branch, then run release.sh again"
+git push origin "refs/tags/$tag" "$branch" \
     || die "pushing $tag or $branch failed: finish the release by hand: see \"Releasing\" in README.md"
 
 step "Building $tag and deploying it to $DEPLOY_SERVER_ID"

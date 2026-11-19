@@ -346,7 +346,7 @@ If the script stops, its last message says what to do:
 
   ```
   git fetch origin main && git merge-base --is-ancestor release/1.0.0 origin/main   # must succeed: else push nothing, start over
-  git push origin v1.0.0 release/1.0.0:refs/heads/release/1.0.0
+  git push origin v1.0.0 release/1.0.0
   ./mvnw release:perform
   gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0 target/checkout/target/sbom-maven-plugin-1.0.0.jar
   git switch main && git pull --ff-only && git branch --delete release/1.0.0
