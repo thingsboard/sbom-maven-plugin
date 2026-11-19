@@ -78,6 +78,38 @@ class SbomBundledTest {
     }
 
     @Test
+    void aComponentKeepsItsExternalReferences() throws IOException {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null).license("MIT")
+                .externalReferences(List.of(new ExternalReference("license", "https://raw.githubusercontent.com/nodejs/node/v22.23.4/LICENSE"))));
+
+        ObjectNode bom = SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components);
+
+        assertThat(bom.path("components").get(0).path("externalReferences")).isEqualTo(Boms.MAPPER.readTree(
+                "[{\"url\": \"https://raw.githubusercontent.com/nodejs/node/v22.23.4/LICENSE\", \"type\": \"license\"}]"));
+        assertThat(new JsonParser().validate(bom, Version.VERSION_16)).isEmpty();
+    }
+
+    @Test
+    void anExternalReferenceNeedsATypeAndAUrl() {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null)
+                .externalReferences(List.of(new ExternalReference("license", " "))));
+
+        assertThatThrownBy(() -> SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Bundled component node@22.23.4 has an external reference without a type or a url");
+    }
+
+    @Test
+    void anExternalReferenceOfAnUnknownTypeFails() {
+        List<BundledComponent> components = List.of(new BundledComponent("application", "node", "22.23.4", null)
+                .externalReferences(List.of(new ExternalReference("licence", "https://nodejs.org"))));
+
+        assertThatThrownBy(() -> SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("/components/0/externalReferences/0/type: does not have a value in the enumeration");
+    }
+
+    @Test
     void theSerialNumberIsTheSameForTheSameContents() {
         assertThat(SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components()).path("serialNumber"))
                 .isEqualTo(SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components()).path("serialNumber"))

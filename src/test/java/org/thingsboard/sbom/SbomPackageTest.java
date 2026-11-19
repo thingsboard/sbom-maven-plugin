@@ -702,11 +702,12 @@ class SbomPackageTest {
 
     @Test
     void configCheckRejectsAComponentSbomWithDetailsOfItsOwn() throws IOException {
-        BundledComponent component = extension(extensionSbom()).license("MIT");
+        BundledComponent component = extension(extensionSbom()).license("MIT")
+                .externalReferences(List.of(new ExternalReference("license", "https://example.com/LICENSE")));
 
         assertThatThrownBy(() -> checkConfig(List.of(debPackage()), List.of(component)))
                 .isInstanceOf(SbomException.class)
-                .hasMessageContaining("takes its details from its SBOM and must not set [license]");
+                .hasMessageContaining("takes its details from its SBOM and must not set [license, externalReferences]");
     }
 
     @Test

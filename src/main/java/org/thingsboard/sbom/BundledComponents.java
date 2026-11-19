@@ -77,6 +77,9 @@ final class BundledComponents {
         if (component.getSupplier() != null) {
             set.add("supplier");
         }
+        if (!component.getExternalReferences().isEmpty()) {
+            set.add("externalReferences");
+        }
         check(set.isEmpty(), "Bundled component " + component.ref() + " takes its details from its SBOM and must not set " + set);
     }
 
@@ -178,6 +181,11 @@ final class BundledComponents {
             check(component.getCpe().startsWith("cpe:2.3:") || component.getCpe().startsWith("cpe:/"),
                     "Bundled component " + component.ref() + " has an invalid cpe " + component.getCpe());
             json.put("cpe", component.getCpe());
+        }
+        for (ExternalReference reference : component.getExternalReferences()) {
+            check(reference.getType() != null && !reference.getType().isBlank() && reference.getUrl() != null && !reference.getUrl().isBlank(),
+                    "Bundled component " + component.ref() + " has an external reference without a type or a url");
+            json.withArray("externalReferences").addObject().put("url", reference.getUrl()).put("type", reference.getType());
         }
         if ("cryptographic-asset".equals(json.path("type").asText())) {
             check(component.getFile() != null && Files.isRegularFile(component.getFile().toPath()),

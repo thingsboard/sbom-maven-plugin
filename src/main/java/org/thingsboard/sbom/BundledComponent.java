@@ -21,6 +21,7 @@ public class BundledComponent {
     private String cpe;
     private String license;
     private Organization supplier;
+    private List<ExternalReference> externalReferences = new ArrayList<>();
     private File file;
     private File sbom;
     private String installDir;
@@ -39,6 +40,7 @@ public class BundledComponent {
         this.cpe = other.cpe;
         this.license = other.license;
         this.supplier = other.supplier;
+        this.externalReferences = other.externalReferences;
         this.file = other.file;
         this.sbom = other.sbom;
         this.installDir = other.installDir;
@@ -80,6 +82,11 @@ public class BundledComponent {
 
     BundledComponent supplier(Organization supplier) {
         this.supplier = supplier;
+        return this;
+    }
+
+    BundledComponent externalReferences(List<ExternalReference> externalReferences) {
+        this.externalReferences = externalReferences;
         return this;
     }
 
@@ -139,6 +146,10 @@ public class BundledComponent {
         return supplier;
     }
 
+    public List<ExternalReference> getExternalReferences() {
+        return externalReferences == null ? List.of() : externalReferences;
+    }
+
     public File getFile() {
         return file;
     }
@@ -188,6 +199,7 @@ public class BundledComponent {
         List<String> values = new ArrayList<>(Arrays.asList(type, group, name, version, description, purl, cpe, license, installDir, bundleDir,
                 file == null ? null : file.getPath(), sbom == null ? null : sbom.getPath()));
         values.addAll(getPackages());
+        getExternalReferences().forEach(reference -> values.addAll(Arrays.asList(reference.getType(), reference.getUrl())));
         if (supplier != null) {
             values.add(supplier.getName());
             values.addAll(supplier.getUrls());
