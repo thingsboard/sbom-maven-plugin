@@ -122,49 +122,71 @@ The build fails, and the file is left untouched, when nothing is configured, the
 
 ## bundled goal
 
+The `bundled` and the `package` goals describe the same packages, so their `name`, `version` and `packages` go into the configuration of the plugin, which both executions share:
+
 ```xml
-<execution>
-    <id>bundled-sbom</id>
-    <goals>
-        <goal>bundled</goal>
-    </goals>
+<plugin>
+    <groupId>org.thingsboard</groupId>
+    <artifactId>sbom-maven-plugin</artifactId>
     <configuration>
         <name>thingsboard</name>
         <packages>
             <package>
                 <id>deb</id>
+                <file>${project.build.directory}/thingsboard.deb</file>
+                <purl>pkg:deb/thingsboard/thingsboard@${project.version}-1?arch=all</purl>
                 <skip>false</skip>
             </package>
             <package>
                 <id>zip</id>
+                <file>${project.build.directory}/thingsboard-windows.zip</file>
+                <purl>pkg:generic/thingsboard/thingsboard-windows@${project.version}</purl>
             </package>
         </packages>
-        <components>
-            <component>
-                <sbom>${project.basedir}/src/main/sbom/gateway-management-extension.cdx.json</sbom>
-                <file>${project.build.directory}/data/resources/js_extensions/gateway-management-extension.js</file>
-            </component>
-            <component>
-                <type>cryptographic-asset</type>
-                <name>DigiCert Global Root G2</name>
-                <file>${project.build.directory}/data/certs/azure/DigiCertGlobalRootG2.crt.pem</file>
-            </component>
-            <component>
-                <type>application</type>
-                <group>com.sun.winsw</group>
-                <name>winsw</name>
-                <version>2.0.1</version>
-                <purl>pkg:maven/com.sun.winsw/winsw@2.0.1?classifier=bin&amp;type=exe</purl>
-                <license>MIT</license>
-                <file>${project.build.directory}/windows/service.exe</file>
-                <packages>
-                    <package>zip</package>
-                </packages>
-            </component>
-        </components>
     </configuration>
-</execution>
+    <executions>
+        <execution>
+            <id>bundled-sbom</id>
+            <goals>
+                <goal>bundled</goal>
+            </goals>
+            <configuration>
+                <components>
+                    <component>
+                        <sbom>${project.basedir}/src/main/sbom/gateway-management-extension.cdx.json</sbom>
+                        <file>${project.build.directory}/data/resources/js_extensions/gateway-management-extension.js</file>
+                    </component>
+                    <component>
+                        <type>cryptographic-asset</type>
+                        <name>DigiCert Global Root G2</name>
+                        <file>${project.build.directory}/data/certs/azure/DigiCertGlobalRootG2.crt.pem</file>
+                    </component>
+                    <component>
+                        <type>application</type>
+                        <group>com.sun.winsw</group>
+                        <name>winsw</name>
+                        <version>2.0.1</version>
+                        <purl>pkg:maven/com.sun.winsw/winsw@2.0.1?classifier=bin&amp;type=exe</purl>
+                        <license>MIT</license>
+                        <file>${project.build.directory}/windows/service.exe</file>
+                        <packages>
+                            <package>zip</package>
+                        </packages>
+                    </component>
+                </components>
+            </configuration>
+        </execution>
+        <execution>
+            <id>package-sbom</id>
+            <goals>
+                <goal>package</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
 ```
+
+The `image` goal has a `version` parameter too: a `version` for the packages that differs from the project version goes into both executions instead, or the images take it as well.
 
 The `bundled` goal runs at `prepare-package` by default: before the packages are built, once the files of the components are in place. What is made before the packages can then read what they bundle, such as third-party notices that go into them. For each package that is not skipped it writes `<outputDirectory>/<name>-<package id>.bundled.cdx.json`, once every package has been checked, also when the package bundles nothing:
 
@@ -175,10 +197,10 @@ The `bundled` goal runs at `prepare-package` by default: before the packages are
 
 | Parameter | Property | Default | Description |
 | --- | --- | --- | --- |
-| `packages` | | required | Packages: `id`, optional `skip`. A `file` and a `purl` are allowed, so the list can be the same as for the `package` goal, but not needed |
+| `packages` | | required | Packages: `id`, optional `skip`; their `file` and `purl`, which the `package` goal needs, are allowed |
 | `components` | | none | Bundled components: `type` (default `library`), `group`, `name`, `version`, `description`, `purl`, `cpe`, `license` (an SPDX license expression such as `MIT` or `EPL-2.0 OR BSD-3-Clause`; the build fails on anything else), `supplier` (`name`, `urls`, `contacts`), `file`, `sbom` (CycloneDX SBOM of `file`; replaces all the other details), `packages` (ids of the packages that contain it; all when empty) |
-| `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component, as for the `package` goal |
-| `version` | `sbom.package.version` | `${project.version}` | Version of the package component, as for the `package` goal |
+| `name` | `sbom.package.name` | `${project.artifactId}` | Name of the package component |
+| `version` | `sbom.package.version` | `${project.version}` | Version of the package component |
 | `outputDirectory` | `sbom.bundled.directory` | `${project.build.directory}/sbom` | Directory to write the bundled SBOMs to |
 | `skip` | `sbom.bundled.skip` | `false` | Skip all packages |
 
@@ -186,27 +208,9 @@ The build fails, and no bundled SBOM is written, when there are no packages, pac
 
 ## package goal
 
-```xml
-<execution>
-    <id>package-sbom</id>
-    <goals>
-        <goal>package</goal>
-    </goals>
-    <configuration>
-        <name>thingsboard</name>
-        <packages>
-            <package>
-                <id>deb</id>
-                <file>${project.build.directory}/thingsboard.deb</file>
-                <purl>pkg:deb/thingsboard/thingsboard@${project.version}-1?arch=all</purl>
-                <skip>false</skip>
-            </package>
-        </packages>
-    </configuration>
-</execution>
-```
+Configured together with the `bundled` goal: see the example there.
 
-The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. It needs the bundled SBOM of every package, which the `bundled` goal writes with the same `name`, `version` and packages. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
+The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. It needs the bundled SBOM of every package that is not skipped, which the `bundled` goal writes; a bundled SBOM of another package, name or version fails the build. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
 
 - The package is the root component (`metadata.component`): the configured `name`, `version` and `purl`, the SHA-256 and SHA-512 of the package file, and the description, licenses, manufacturer and website of the application.
 - The application SBOM's root and all its components and dependencies are kept unchanged; the package depends on the application.
@@ -298,7 +302,7 @@ The build fails, and nothing is attached, when the repository is not `<namespace
 
 ## Skipping
 
-`-Dsbom.skip=true` skips every goal of the plugin, whatever the `skip` of a goal says. A build that makes SBOMs only on request sets the `sbom.skip` property to `true` in the POM and runs with `-Dsbom.skip=false`, or in a profile that sets it to `false`, when it needs them.
+`-Dsbom.skip=true` skips every goal of the plugin, whatever the `skip` of a goal says. Skip the `bundled` and the `package` goals together, with `sbom.skip`: the `package` goal fails without the bundled SBOMs. A build that makes SBOMs only on request sets the `sbom.skip` property to `true` in the POM and runs with `-Dsbom.skip=false`, or in a profile that sets it to `false`, when it needs them.
 
 ## Building
 

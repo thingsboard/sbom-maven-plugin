@@ -37,8 +37,8 @@ public final class SbomBundled {
     }
 
     /**
-     * The root of the bundled SBOM of a package: the package checks it, so that a bundled SBOM of another package, or one
-     * that an older build left, is not added.
+     * The root of the bundled SBOM of a package: the package goal checks it, so that a bundled SBOM of another package,
+     * name or version is not added.
      */
     static String rootRef(String name, String packageId, String version) {
         return name + "-" + packageId + "-bundled@" + version;
@@ -57,13 +57,8 @@ public final class SbomBundled {
     }
 
     public static void checkConfig(List<PackageFile> packages, List<BundledComponent> components) {
-        check(packages != null && !packages.isEmpty(), "No packages configured");
-        Set<String> ids = new LinkedHashSet<>();
-        for (PackageFile packageFile : packages) {
-            check(packageFile.getId() != null && !packageFile.getId().isBlank(), "A package has no id");
-            check(ids.add(packageFile.getId()), "Package id " + packageFile.getId() + " is used more than once");
-        }
-        BundledComponents.validate(components, BundledComponents.Goal.PACKAGE);
+        Set<String> ids = PackageFile.checkIds(packages);
+        BundledComponents.validate(components, BundledComponents.Goal.BUNDLED);
         for (BundledComponent component : components) {
             for (String id : component.getPackages()) {
                 check(ids.contains(id), "Bundled component " + component.ref() + " refers to unknown package " + id + "; known packages are " + ids);
@@ -72,14 +67,13 @@ public final class SbomBundled {
     }
 
     static ObjectNode describe(String name, String version, String packageId, List<BundledComponent> components) {
-        BundledComponents.validate(components, BundledComponents.Goal.PACKAGE);
+        BundledComponents.validate(components, BundledComponents.Goal.BUNDLED);
         return describe(name, version, packageId, components, new HashMap<>());
     }
 
     private static ObjectNode describe(String name, String version, String packageId, List<BundledComponent> components,
                                        Map<BundledComponent, Resolved> resolved) {
-        check(name != null && !name.isBlank(), "Package name is blank");
-        check(version != null && !version.isBlank(), "Package version is blank");
+        PackageFile.checkNameAndVersion(name, version);
         String rootRef = rootRef(name, packageId, version);
         String specVersion = MavenComponents.SPEC_VERSION.getVersionString();
         List<Resolved> included = components.stream()

@@ -31,24 +31,21 @@ public final class SbomPackage {
             return List.of();
         }
         JsonNode application = SbomFiles.readFile(applicationSbom);
+        SbomChecks.checkInput("Application", application);
         Map<Path, ObjectNode> described = new LinkedHashMap<>();
         for (PackageFile packageFile : included) {
             Path bundledFile = SbomBundled.file(bundledDirectory, name, packageFile.getId());
             check(Files.isRegularFile(bundledFile), "Package " + packageFile.getId() + " has no bundled SBOM " + bundledFile
                     + "; run the bundled goal before this one, with the same name and packages");
-            described.put(outputFile(packageFile), describe(application, name, version, packageFile, SbomFiles.readFile(bundledFile)));
+            described.put(outputFile(packageFile), describeChecked(application, name, version, packageFile, SbomFiles.readFile(bundledFile)));
         }
         described.forEach(SbomFiles::writeFile);
         return List.copyOf(described.keySet());
     }
 
     public static void checkConfig(List<PackageFile> packages) {
-        check(packages != null && !packages.isEmpty(), "No packages configured");
-        Set<String> ids = new LinkedHashSet<>();
-        for (PackageFile packageFile : packages) {
-            checkPackage(packageFile);
-            check(ids.add(packageFile.getId()), "Package id " + packageFile.getId() + " is used more than once");
-        }
+        PackageFile.checkIds(packages);
+        packages.forEach(SbomPackage::checkPackage);
     }
 
     private static Path outputFile(PackageFile packageFile) {
@@ -67,16 +64,20 @@ public final class SbomPackage {
      */
     static ObjectNode describe(JsonNode application, String name, String version, PackageFile packageFile, JsonNode bundled) {
         SbomChecks.checkInput("Application", application);
+        return describeChecked(application, name, version, packageFile, bundled);
+    }
+
+    private static ObjectNode describeChecked(JsonNode application, String name, String version, PackageFile packageFile, JsonNode bundled) {
         checkPackage(packageFile);
-        check(name != null && !name.isBlank(), "Package name is blank");
-        check(version != null && !version.isBlank(), "Package version is blank");
+        PackageFile.checkNameAndVersion(name, version);
         Path file = packageFile.getFile().toPath();
         check(Files.isRegularFile(file), "Package file " + file + " does not exist");
         check(size(file) > 0, "Package file " + file + " is empty");
 
         String specVersion = application.path("specVersion").asText();
-        check(specVersion.equals(bundled.path("specVersion").asText()),
-                "Bundled SBOM of package " + packageFile.getId() + " is CycloneDX " + bundled.path("specVersion").asText() + ", but the application SBOM is " + specVersion);
+        String bundledSpecVersion = bundled.path("specVersion").asText();
+        check(specVersion.equals(bundledSpecVersion),
+                "Bundled SBOM of package " + packageFile.getId() + " is CycloneDX " + bundledSpecVersion + ", but the application SBOM is " + specVersion);
         SbomChecks.checkInput("Bundled", bundled);
         String bundledRoot = SbomChecks.rootRef(bundled);
         String expectedRoot = SbomBundled.rootRef(name, packageFile.getId(), version);
@@ -92,7 +93,7 @@ public final class SbomPackage {
         existingRefs.add(applicationRef);
         check(!existingRefs.contains(packageRef), "Package purl " + packageRef + " is already used by a component of the application SBOM");
         for (String ref : direct) {
-            check(!existingRefs.contains(ref) && !ref.equals(packageRef), "Bundled component " + ref + " clashes with a component that is already in the SBOM");
+            check(!existingRefs.contains(ref), "Bundled component " + ref + " clashes with a component that is already in the SBOM");
         }
 
         Map<String, String> packageHashes = SbomFiles.hashes(file);

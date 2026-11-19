@@ -13,7 +13,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,8 +56,8 @@ class SbomBundledTest {
 
     @Test
     void listsTheComponentsOfThePackageOnly() {
-        assertThat(refs(SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components()))).containsExactly("gateway-management-extension@4.4.0.1");
-        assertThat(refs(SbomBundled.describe("thingsboard", "4.4.0.1", "zip", components()))).containsExactly("gateway-management-extension@4.4.0.1", WINSW_REF);
+        assertThat(SbomChecks.componentRefs(SbomBundled.describe("thingsboard", "4.4.0.1", "deb", components()))).containsExactly("gateway-management-extension@4.4.0.1");
+        assertThat(SbomChecks.componentRefs(SbomBundled.describe("thingsboard", "4.4.0.1", "zip", components()))).containsExactly("gateway-management-extension@4.4.0.1", WINSW_REF);
     }
 
     @Test
@@ -124,12 +123,6 @@ class SbomBundledTest {
         assertThatThrownBy(() -> SbomBundled.checkConfig(List.of(new PackageFile(" ", null, null, false)), List.of()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("A package has no id");
-    }
-
-    static List<String> refs(JsonNode bom) {
-        List<String> refs = new ArrayList<>();
-        bom.path("components").forEach(component -> refs.add(component.path("bom-ref").asText()));
-        return refs;
     }
 
 }

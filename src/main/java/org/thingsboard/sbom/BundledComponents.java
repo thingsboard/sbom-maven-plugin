@@ -32,7 +32,7 @@ final class BundledComponents {
 
     enum Goal {
 
-        PACKAGE, IMAGE
+        BUNDLED, IMAGE
 
     }
 
@@ -47,7 +47,7 @@ final class BundledComponents {
             } else {
                 checkNoDetails(component);
             }
-            if (goal == Goal.PACKAGE) {
+            if (goal == Goal.BUNDLED) {
                 checkPackageAnchor(component);
             } else {
                 checkImageAnchors(component);

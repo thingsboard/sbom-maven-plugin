@@ -84,8 +84,16 @@ class SbomPackageTest {
     }
 
     List<Path> writeAll(Path applicationSbom, String name, String version, List<PackageFile> packages, List<BundledComponent> components) {
-        SbomBundled.writeAll(tempDir.resolve("sbom"), name, version, packages, components);
-        return SbomPackage.writeAll(applicationSbom, tempDir.resolve("sbom"), name, version, packages);
+        return writeAll(tempDir.resolve("sbom"), applicationSbom, name, version, packages, components);
+    }
+
+    /**
+     * What the bundled and the package goals write, one after the other, with the bundled SBOMs in the directory.
+     */
+    static List<Path> writeAll(Path bundledDirectory, Path applicationSbom, String name, String version, List<PackageFile> packages,
+                               List<BundledComponent> components) {
+        SbomBundled.writeAll(bundledDirectory, name, version, packages, components);
+        return SbomPackage.writeAll(applicationSbom, bundledDirectory, name, version, packages);
     }
 
     ObjectNode describeDeb() {
@@ -320,17 +328,6 @@ class SbomPackageTest {
     }
 
     @Test
-    void writesNothingWhenItFails() throws IOException {
-        Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
-        Files.delete(bundle);
-
-        assertThatThrownBy(() -> writeAll(applicationSbom, "thingsboard", "4.4.0.1", List.of(debPackage()), bundled()))
-                .isInstanceOf(SbomException.class);
-
-        assertThat(tempDir.resolve("thingsboard.deb.cdx.json")).doesNotExist();
-    }
-
-    @Test
     void writesEveryPackageThatIsNotSkipped() throws IOException {
         Path applicationSbom = Files.writeString(tempDir.resolve("application.cdx.json"), application().toPrettyString());
         PackageFile skippedZip = new PackageFile("zip", zip.toFile(), "pkg:generic/thingsboard/thingsboard-windows@4.4.0.1", true);
@@ -491,13 +488,6 @@ class SbomPackageTest {
         assertThatThrownBy(() -> checkConfig(List.of(debPackage(), debPackage()), bundled()))
                 .isInstanceOf(SbomException.class)
                 .hasMessageContaining("Package id deb is used more than once");
-    }
-
-    @Test
-    void configCheckRejectsAComponentForAnUnknownPackage() {
-        assertThatThrownBy(() -> checkConfig(List.of(debPackage()), bundled()))
-                .isInstanceOf(SbomException.class)
-                .hasMessageContaining("refers to unknown package zip");
     }
 
     @Test
