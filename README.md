@@ -210,7 +210,7 @@ The build fails, and no bundled SBOM is written, when there are no packages, pac
 
 Configured together with the `bundled` goal: see the example there.
 
-The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. It needs the bundled SBOM of every package that is not skipped, which the `bundled` goal writes; a bundled SBOM of another package, name or version fails the build. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
+The `package` goal runs at `package` by default. Declare the plugin after the plugins that build the packages, so it runs after them in the same phase. It needs the bundled SBOM of every package that is not skipped, which the `bundled` goal writes; a bundled SBOM of another package, name or version fails the build. The application SBOM must be CycloneDX 1.6, as the bundled SBOMs are. For each package that is not skipped it writes `<package file>.cdx.json` next to the package, once every package has been checked:
 
 - The package is the root component (`metadata.component`): the configured `name`, `version` and `purl`, the SHA-256 and SHA-512 of the package file, and the description, licenses, manufacturer and website of the application.
 - The application SBOM's root and all its components and dependencies are kept unchanged; the package depends on the application.
@@ -299,6 +299,10 @@ A bundled component without an `sbom`, such as a browser an install script downl
 | `skip` | `sbom.image.skip` | `false` | Skip the image SBOMs |
 
 The build fails, and nothing is attached, when the repository is not `<namespace>/<name>` after the optional registry, no tag is configured, `docker`, `syft` or `oras` is missing or fails (the message of the tool is reported), a tag is not a multi-architecture image with Linux images, an architecture is not lowercase letters and digits, the version is blank, no components are configured, a component has no name, is declared twice, has an `sbom` together with details of its own, sets `packages`, or has a supplier without name or with a blank url, a component with an `sbom` sets none or more than one of `file`, `installDir` and `bundleDir`, a component without an `sbom` sets a directory, a directory is not absolute or ends with `/`, a value still contains an unresolved `${...}` property, the scan does not list a `file` package exactly once or lists it with another version, the scan lists a component of a `file` component's SBOM, the image has a component without a purl under a directory, or a package that the SBOM does not list or lists with another version, a required package is not installed at its path or has no path, components clash, the result fails schema validation, or a component is not reachable from the image.
+
+## Upgrading to 3.0.0
+
+The `package` goal no longer takes `components`. Move them to an execution of the `bundled` goal, and put `name`, `version` and `packages` into the configuration of the plugin, as in the [bundled goal](#bundled-goal) example. A `package` execution that still has `components` fails the build. The application SBOM of the `package` goal must be CycloneDX 1.6.
 
 ## Skipping
 

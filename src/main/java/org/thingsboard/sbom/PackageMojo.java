@@ -53,6 +53,14 @@ public class PackageMojo extends SbomMojo {
     private File bundledDirectory;
 
     /**
+     * No longer taken: the bundled components moved to the {@code bundled} goal in 3.0.0. Maven ignores a parameter that a
+     * goal does not have, so a configuration from before would lose them from the package SBOMs without a word; set, this
+     * fails the build instead.
+     */
+    @Parameter
+    private List<BundledComponent> components;
+
+    /**
      * Skip all packages.
      */
     @Parameter(property = "sbom.package.skip", defaultValue = "false")
@@ -70,6 +78,8 @@ public class PackageMojo extends SbomMojo {
 
     @Override
     void run() {
+        SbomChecks.check(components == null || components.isEmpty(), "The package goal no longer takes components: move <components> from"
+                + " this execution to an execution of the bundled goal, which writes what each package bundles before the packages are built");
         SbomPackage.checkConfig(packages);
         packages.stream().filter(PackageFile::isSkip).forEach(packageFile -> getLog().info("Skipping package SBOM for " + packageFile.getId()));
         for (Path output : SbomPackage.writeAll(sourceFile.toPath(), bundledDirectory.toPath(), name, version, packages)) {

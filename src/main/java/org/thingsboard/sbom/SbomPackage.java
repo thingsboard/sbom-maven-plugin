@@ -77,7 +77,8 @@ public final class SbomPackage {
         String specVersion = application.path("specVersion").asText();
         String bundledSpecVersion = bundled.path("specVersion").asText();
         check(specVersion.equals(bundledSpecVersion),
-                "Bundled SBOM of package " + packageFile.getId() + " is CycloneDX " + bundledSpecVersion + ", but the application SBOM is " + specVersion);
+                "Bundled SBOM of package " + packageFile.getId() + " is CycloneDX " + bundledSpecVersion + ", but the application SBOM is " + specVersion
+                        + "; the package goal needs an application SBOM of CycloneDX " + bundledSpecVersion + ", which the bundled goal writes");
         SbomChecks.checkInput("Bundled", bundled);
         String bundledRoot = SbomChecks.rootRef(bundled);
         String expectedRoot = SbomBundled.rootRef(name, packageFile.getId(), version);
