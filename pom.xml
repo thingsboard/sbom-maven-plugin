@@ -397,7 +397,7 @@
                     <configuration>
                         <scmReleaseCommitComment>chore: release @{releaseLabel}</scmReleaseCommitComment>
                         <scmDevelopmentCommitComment>chore: start development after @{releaseLabel}</scmDevelopmentCommitComment>
-                        <!-- main takes changes only through PRs: release.sh pushes the commits as a PR branch, and the tag once the PR is merged -->
+                        <!-- main takes changes only through PRs, so release.sh does the pushing: see "Releasing" in README.md -->
                         <pushChanges>false</pushChanges>
                         <!-- release:perform builds the tag from this clone instead of fetching it from GitHub -->
                         <localCheckout>true</localCheckout>
