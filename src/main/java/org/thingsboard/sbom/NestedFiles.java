@@ -17,9 +17,10 @@ import java.util.zip.ZipFile;
 
 /**
  * Checks the files that a nested SBOM places inside the library that carries it, such as fonts or images that a library
- * bundles. A component, at any depth, that gives a location in {@code evidence.occurrences} is a file of the library at
- * that path; when it also has hashes, the file must have them. A component without a location, such as an npm package
- * that a web UI bundles into its scripts, is not checked.
+ * bundles. A component of type {@code file}, at any depth, that gives a location in {@code evidence.occurrences} is a
+ * file of the library at that path; when it also has hashes, the file must have them. Other components are not checked:
+ * an npm package that a web UI bundles into its scripts has no location, and the occurrences of a library can say where
+ * the source uses it.
  */
 final class NestedFiles {
 
@@ -64,7 +65,7 @@ final class NestedFiles {
 
     private static void collect(JsonNode components, List<JsonNode> located) {
         for (JsonNode component : components) {
-            if (component.path("evidence").path("occurrences").size() > 0) {
+            if ("file".equals(component.path("type").asText()) && component.path("evidence").path("occurrences").size() > 0) {
                 located.add(component);
             }
             collect(component.path("components"), located);

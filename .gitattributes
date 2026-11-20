@@ -1,0 +1,2 @@
+# Fonts are binary: a checkout must not change the line endings of a test font, whose SBOM gives its hash
+*.ttf binary

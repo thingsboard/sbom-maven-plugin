@@ -33,7 +33,7 @@ class NestedFilesTest {
         JsonNode sbom = sbom("""
                 {"components": [
                   {"bom-ref": "roboto", "name": "Roboto", "components": [
-                    {"bom-ref": "regular", "name": "Roboto-Regular.ttf",
+                    {"type": "file", "bom-ref": "regular", "name": "Roboto-Regular.ttf",
                      "hashes": [{"alg": "SHA-256", "content": "%s"}, {"alg": "SHA-1", "content": "%s"}],
                      "evidence": {"occurrences": [{"location": "%s"}]}}]},
                   {"bom-ref": "echarts", "name": "echarts", "hashes": [{"alg": "SHA-256", "content": "00"}]}]}
@@ -46,6 +46,16 @@ class NestedFilesTest {
     void anSbomWithoutLocationsIsNotChecked() throws IOException {
         JsonNode sbom = sbom("""
                 {"components": [{"bom-ref": "echarts", "name": "echarts", "hashes": [{"alg": "SHA-256", "content": "00"}]}]}
+                """);
+
+        assertThat(NestedFiles.check(dir.resolve("missing.jar"), "org.example:ui", sbom)).isZero();
+    }
+
+    @Test
+    void theOccurrencesOfAComponentThatIsNotAFileAreNotChecked() throws IOException {
+        JsonNode sbom = sbom("""
+                {"components": [{"type": "library", "bom-ref": "lodash", "name": "lodash",
+                  "evidence": {"occurrences": [{"location": "src/app/main.ts", "line": 12}]}}]}
                 """);
 
         assertThat(NestedFiles.check(dir.resolve("missing.jar"), "org.example:ui", sbom)).isZero();
@@ -92,7 +102,7 @@ class NestedFilesTest {
 
     private JsonNode located(String hashes, String location) throws IOException {
         return sbom("""
-                {"components": [{"bom-ref": "regular", "name": "Roboto-Regular.ttf", %s
+                {"components": [{"type": "file", "bom-ref": "regular", "name": "Roboto-Regular.ttf", %s
                   "evidence": {"occurrences": [{"location": "%s"}]}}]}
                 """.formatted(hashes, location));
     }
