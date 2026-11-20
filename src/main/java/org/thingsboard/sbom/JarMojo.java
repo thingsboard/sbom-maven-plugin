@@ -260,6 +260,10 @@ public class JarMojo extends SbomMojo {
                 .orElseThrow(() -> new MojoFailureException(nested.getLibrary() + " is not a dependency of " + project.getId()));
         String path = nested.resourceOr("META-INF/sbom/" + coordinates[1] + ".cdx.json");
         JsonNode sbom = SbomFiles.readResource(host.getFile().toPath(), path);
+        int files = NestedFiles.check(host.getFile().toPath(), nested.getLibrary(), sbom);
+        if (files > 0) {
+            getLog().info("Checked the " + files + (files == 1 ? " file" : " files") + " that the SBOM of " + nested.getLibrary() + " places in the library");
+        }
         getLog().info("Adding " + sbom.path("components").size() + " components from " + nested.getLibrary() + " (" + path + ")");
         return SbomMerger.merge(bom, sbom, "pkg:maven/" + coordinates[0] + "/" + coordinates[1] + "@");
     }
