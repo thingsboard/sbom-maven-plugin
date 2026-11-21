@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -10,6 +11,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,7 +45,8 @@ public class FontsMojo extends SbomMojo {
     private String directory;
 
     /**
-     * Where the generated font SBOM is written.
+     * Where the generated font SBOM is written, or the existing CycloneDX SBOM to merge into when {@link #merge} is
+     * {@code true}.
      */
     @Parameter(property = "sbom.fonts.outputFile", defaultValue = "${project.build.outputDirectory}/META-INF/sbom/${project.artifactId}.cdx.json", required = true)
     private File outputFile;
@@ -76,10 +79,18 @@ public class FontsMojo extends SbomMojo {
     /**
      * When the SBOM was made; sets {@code metadata.timestamp}. By default the time Maven builds reproducibly with: a
      * date and time with an offset ({@code 2026-01-31T12:00:00Z}) or seconds since 1970. Not set, or left at the
-     * {@code 1980-02-01T00:00:00Z} that Maven sets by itself, {@code metadata.timestamp} is omitted.
+     * {@code 1980-02-01T00:00:00Z} that Maven sets by itself, {@code metadata.timestamp} is omitted. Ignored when
+     * {@link #merge} is {@code true}, which preserves the target SBOM's existing timestamp.
      */
     @Parameter(property = "sbom.fonts.timestamp", defaultValue = "${project.build.outputTimestamp}")
     private String timestamp;
+
+    /**
+     * When {@code true}, merge the font components into an existing CycloneDX SBOM at {@link #outputFile} (attaching
+     * them to its root component) instead of writing a standalone font SBOM.
+     */
+    @Parameter(property = "sbom.fonts.merge", defaultValue = "false")
+    private boolean merge;
 
     /**
      * Skip the font SBOM.
@@ -99,7 +110,9 @@ public class FontsMojo extends SbomMojo {
 
     @Override
     void run() {
-        String time = SbomMetadata.timestamp(timestamp);
+        Path target = outputFile.toPath();
+        JsonNode existing = merge ? SbomFiles.readFile(target) : null;
+        String time = merge ? null : SbomMetadata.timestamp(timestamp);
         SbomFonts.Result result = SbomFonts.describe(
                 project.getGroupId(),
                 project.getArtifactId(),
@@ -110,13 +123,13 @@ public class FontsMojo extends SbomMojo {
                 FontLicense.toMap(licenses),
                 time != null
         );
-        ObjectNode bom = result.bom();
+        ObjectNode bom = merge ? SbomMerger.mergeIntoRoot(existing, result.bom()) : result.bom();
         if (manufacturer != null || supplier != null || componentManufacturer != null || time != null) {
             bom = SbomMetadata.apply(bom, manufacturer, supplier, componentManufacturer, time);
         }
-        SbomFiles.writeFile(outputFile.toPath(), bom);
-        getLog().info("Wrote " + outputFile + " with " + result.families() + " font "
-                + (result.families() == 1 ? "family" : "families") + " (" + result.files() + " "
-                + (result.files() == 1 ? "file" : "files") + ")");
+        SbomFiles.writeFile(target, bom);
+        String summary = result.families() + " font " + (result.families() == 1 ? "family" : "families")
+                + " (" + result.files() + " " + (result.files() == 1 ? "file" : "files") + ")";
+        getLog().info(merge ? "Merged " + summary + " into " + outputFile : "Wrote " + outputFile + " with " + summary);
     }
 }

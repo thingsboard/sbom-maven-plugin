@@ -406,6 +406,47 @@ class SbomMergerTest {
     }
 
     @Test
+    void mergesIntoRootPreservingExistingDependenciesAndWhenTargetAndNestedShareRootRef() {
+        ObjectNode target = Boms.bom("1.6", "shared-root");
+        component(target, "a", "pkg:generic/a@1.0");
+        dependency(target, "shared-root", "a");
+        dependency(target, "a");
+
+        ObjectNode nestedSameRoot = Boms.bom("1.6", "shared-root");
+        component(nestedSameRoot, "b", "pkg:generic/b@1.0");
+        dependency(nestedSameRoot, "shared-root", "b");
+        dependency(nestedSameRoot, "b");
+
+        ObjectNode merged = SbomMerger.mergeIntoRoot(target, nestedSameRoot);
+        assertThat(SbomChecks.dependencyGraph(merged).get("shared-root")).containsExactlyInAnyOrder("a", "b");
+        assertThat(findComponent(merged, "a")).isNotNull();
+        assertThat(findComponent(merged, "b")).isNotNull();
+    }
+
+    @Test
+    void mergesIntoRootWhenTargetHasNoDependenciesArray() {
+        ObjectNode target = Boms.bom("1.6", "app-root");
+        target.remove("dependencies");
+
+        ObjectNode merged = SbomMerger.mergeIntoRoot(target, simpleNested());
+        assertThat(SbomChecks.dependencyGraph(merged).get("app-root")).containsExactly("a");
+        assertThat(SbomChecks.dependencyGraph(merged).get("a")).containsExactly("b");
+    }
+
+    @Test
+    void failsWhenNestedComponentCollidesWithTargetRootRef() {
+        ObjectNode target = Boms.bom("1.6", "app-root");
+        ObjectNode nested = Boms.bom("1.6", "fonts-root");
+        component(nested, "app-root", "pkg:generic/app-root@1.0");
+        dependency(nested, "fonts-root", "app-root");
+        dependency(nested, "app-root");
+
+        assertThatThrownBy(() -> SbomMerger.mergeIntoRoot(target, nested))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Nested component app-root conflicts with the target root component");
+    }
+
+    @Test
     void failsWhenANestedComponentIsNotReachableFromTheNestedRoot() {
         ObjectNode nested = simpleNested();
         component(nested, "orphan", "pkg:npm/orphan@1.0.0");

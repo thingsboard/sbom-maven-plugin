@@ -54,11 +54,11 @@ record FontMetadata(String family, String version, String copyright, String lice
     private static final int NAME_LICENSE_URL = 14;
     private static final int NAME_TYPOGRAPHIC_FAMILY = 16;
 
-    private static final Charset MAC_ROMAN = Charset.isSupported("x-MacRoman")
+    static final Charset MAC_ROMAN = Charset.isSupported("x-MacRoman")
             ? Charset.forName("x-MacRoman")
             : StandardCharsets.ISO_8859_1;
 
-    private static final Pattern VERSION_PREFIX = Pattern.compile("^(?:version\\s+)+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern VERSION_PREFIX = Pattern.compile("^(?:version(?:\\s+|$))+", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern MIT_LICENSE_PHRASE = Pattern.compile("\\bthe mit license\\b|\\bmit license\\b");
 
@@ -81,7 +81,6 @@ record FontMetadata(String family, String version, String copyright, String lice
     private static FontMetadata parse(SeekableByteChannel channel, String source) throws IOException {
         byte[] nameTable = readNameTable(channel, source);
         ByteBuffer buf = ByteBuffer.wrap(nameTable).order(ByteOrder.BIG_ENDIAN);
-        check(nameTable.length >= 6, "Font " + source + " has a truncated OpenType name table");
 
         int format = buf.getShort(0) & 0xFFFF;
         check(format == 0 || format == 1, "Font " + source + " has unsupported OpenType name table format " + format);
@@ -294,8 +293,7 @@ record FontMetadata(String family, String version, String copyright, String lice
             return "";
         }
         String collapsed = WHITESPACE.matcher(raw.split(";", 2)[0]).replaceAll(" ").trim();
-        String stripped = VERSION_PREFIX.matcher(collapsed).replaceFirst("").trim();
-        return stripped.isEmpty() ? collapsed : stripped;
+        return VERSION_PREFIX.matcher(collapsed).replaceFirst("");
     }
 
     private static String resolveSpdx(String nameOrUrl) {

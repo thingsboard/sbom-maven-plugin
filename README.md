@@ -118,13 +118,14 @@ Embedded license metadata is automatically recognized for `OFL-1.1`, `OFL-1.0`, 
 | --- | --- | --- | --- |
 | `resourcesDirectory` | `sbom.fonts.resourcesDirectory` | `${project.build.outputDirectory}` | Root of resources packed into the jar (paths relative to this directory become `evidence.occurrences[].location`) |
 | `directory` | `sbom.fonts.directory` | `fonts` | Subdirectory under `resourcesDirectory` containing `.ttf`/`.otf` files (empty scans `resourcesDirectory`) |
-| `outputFile` | `sbom.fonts.outputFile` | `${project.build.outputDirectory}/META-INF/sbom/${project.artifactId}.cdx.json` | Where the font SBOM is written |
+| `outputFile` | `sbom.fonts.outputFile` | `${project.build.outputDirectory}/META-INF/sbom/${project.artifactId}.cdx.json` | Where the font SBOM is written (or the existing SBOM to merge into when `merge` is `true`) |
+| `merge` | `sbom.fonts.merge` | `false` | Merge font components into an existing CycloneDX SBOM at `outputFile` (attached to its root component) instead of writing a standalone font SBOM |
 | `licenses` | | none | Optional list of `<fontLicense>` overrides (`font`: relative path or family name; `license`: SPDX expression) |
 | `manufacturer`, `supplier`, `componentManufacturer` | | | As in the `metadata` goal |
-| `timestamp` | `sbom.fonts.timestamp` | `${project.build.outputTimestamp}` | Date and time with offset (`2026-01-31T12:00:00Z`) or seconds since 1970; omitted when unset or `1980-02-01T00:00:00Z` |
+| `timestamp` | `sbom.fonts.timestamp` | `${project.build.outputTimestamp}` | Date and time with offset (`2026-01-31T12:00:00Z`) or seconds since 1970; omitted when unset or `1980-02-01T00:00:00Z`. Ignored when `merge` is `true` (preserves the target SBOM's timestamp) |
 | `skip` | `sbom.fonts.skip` | `false` | Skip the font SBOM |
 
-The build fails, and no file is written, when `resourcesDirectory` or `directory` does not exist, `directory` escapes `resourcesDirectory`, no `.ttf`/`.otf` files are found, a font file is not a valid TrueType/OpenType binary or lacks a family name, a font's license cannot be determined, a `licenses` override has a blank `font`/`license`, conflicts, or is not a valid SPDX expression, or the generated SBOM fails CycloneDX 1.6 schema validation.
+The build fails, and no file is written, when `resourcesDirectory` or `directory` does not exist, `directory` escapes `resourcesDirectory`, no `.ttf`/`.otf` files are found, a font file is not a valid TrueType/OpenType binary or lacks a family name, a font's license cannot be determined, a `licenses` override has a blank `font`/`license`, conflicts, or is not a valid SPDX expression, `merge` is `true` and `outputFile` is missing, invalid, has a different specVersion, or has a conflicting `bom-ref`, or the generated SBOM fails CycloneDX 1.6 schema validation.
 
 ## metadata goal
 
