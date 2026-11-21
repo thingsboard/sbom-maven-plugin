@@ -16,6 +16,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -95,21 +96,25 @@ final class SbomFiles {
         return result;
     }
 
-    static JsonNode readResource(Path source, String resource) {
+    static Optional<JsonNode> readResourceIfPresent(Path source, String resource) {
         if (!Files.isRegularFile(source)) {
             throw new SbomException("SBOM source " + source + " does not exist");
         }
         try (ZipFile zip = new ZipFile(source.toFile())) {
             ZipEntry entry = zip.getEntry(resource);
-            if (entry == null) {
-                throw missingResource(source, resource);
+            if (entry == null || entry.isDirectory()) {
+                return Optional.empty();
             }
             try (InputStream in = zip.getInputStream(entry)) {
-                return MAPPER.readTree(in);
+                return Optional.of(MAPPER.readTree(in));
             }
         } catch (IOException e) {
             throw new SbomException("Failed to read " + resource + " from " + source, e);
         }
+    }
+
+    static JsonNode readResource(Path source, String resource) {
+        return readResourceIfPresent(source, resource).orElseThrow(() -> missingResource(source, resource));
     }
 
     private static SbomException missingResource(Path source, String resource) {

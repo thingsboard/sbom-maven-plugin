@@ -31,6 +31,8 @@ class SbomFilesTest {
         JsonNode bom = SbomFiles.readResource(jar, RESOURCE);
 
         assertThat(bom).isEqualTo(Boms.npmFixture());
+        assertThat(SbomFiles.readResourceIfPresent(jar, RESOURCE)).contains(Boms.npmFixture());
+        assertThat(SbomFiles.readResourceIfPresent(jar, "META-INF/sbom/other.cdx.json")).isEmpty();
     }
 
     @Test

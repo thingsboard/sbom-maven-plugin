@@ -25,10 +25,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -107,6 +110,21 @@ public class JarMojo extends SbomMojo {
     private List<NestedSbom> nestedSboms = new ArrayList<>();
 
     /**
+     * Automatically fold in {@code META-INF/sbom/<artifactId>.cdx.json} from packed libraries whose {@code groupId}
+     * matches {@link #nestedSbomGroups}. Any library listed in {@link #nestedSboms} (including one with
+     * {@code <skip>true</skip>}) is handled by that explicit entry instead.
+     */
+    @Parameter(property = "sbom.jar.autoDiscoverNestedSboms", defaultValue = "true")
+    private boolean autoDiscoverNestedSboms;
+
+    /**
+     * Group prefixes eligible for {@link #autoDiscoverNestedSboms}. Defaults to {@code ${project.groupId}}
+     * (matching exact group or {@code <groupId>.*}) when empty.
+     */
+    @Parameter
+    private List<String> nestedSbomGroups = new ArrayList<>();
+
+    /**
      * CycloneDX type of the component of the project.
      */
     @Parameter(property = "sbom.jar.projectType", defaultValue = "application")
@@ -165,6 +183,7 @@ public class JarMojo extends SbomMojo {
         MavenComponents maven = new MavenComponents(session, project, projectBuilder, artifactHandlerManager, getLog()::warn);
         Map<String, Artifact> artifacts = artifactsByFileName(project.getArtifacts());
         List<Component> components = new ArrayList<>();
+        List<PackedArtifact> packedArtifacts = new ArrayList<>();
         Set<String> dependencies = new LinkedHashSet<>();
         List<String> unknown = new ArrayList<>();
         for (Library library : packed) {
@@ -177,6 +196,7 @@ public class JarMojo extends SbomMojo {
             component.setHashes(MavenComponents.hashes(library.hashes()));
             components.add(component);
             if (artifact != null) {
+                packedArtifacts.add(new PackedArtifact(artifact, component.getPurl()));
                 dependencies.add(component.getBomRef());
             }
         }
@@ -190,9 +210,33 @@ public class JarMojo extends SbomMojo {
         JarSbom.linkByPoms(graph, dependencies, maven.poms())
                 .forEach(ref -> getLog().warn("No pom of a packed library names " + ref + ", so the SBOM makes it a dependency of the project"));
         ObjectNode bom = JarSbom.bom(maven.root(project, projectType), MavenComponents.tool(plugin), components, graph, time != null);
+        Set<String> explicitNested = new HashSet<>();
         for (NestedSbom nested : nestedSboms) {
+            String[] coordinates = nested.coordinates();
+            explicitNested.add(coordinates[0] + ":" + coordinates[1]);
             if (!nested.isSkip()) {
                 bom = merge(bom, nested);
+            }
+        }
+        if (autoDiscoverNestedSboms) {
+            List<String> groups = nestedSbomGroups.isEmpty() ? List.of(project.getGroupId()) : nestedSbomGroups;
+            List<PackedArtifact> candidates = new ArrayList<>(packedArtifacts);
+            candidates.sort(Comparator.comparing((PackedArtifact p) -> p.artifact().getGroupId())
+                    .thenComparing(p -> p.artifact().getArtifactId())
+                    .thenComparing(p -> p.artifact().getClassifier() == null ? "" : p.artifact().getClassifier())
+                    .thenComparing(p -> p.artifact().getType() == null ? "" : p.artifact().getType()));
+            Set<String> mergedPurls = new HashSet<>();
+            for (PackedArtifact candidate : candidates) {
+                Artifact artifact = candidate.artifact();
+                String key = artifact.getGroupId() + ":" + artifact.getArtifactId();
+                if (explicitNested.contains(key) || !matchesGroup(artifact.getGroupId(), groups) || !mergedPurls.add(candidate.purl())) {
+                    continue;
+                }
+                String path = NestedSbom.defaultResource(artifact.getArtifactId());
+                Optional<JsonNode> found = SbomFiles.readResourceIfPresent(artifact.getFile().toPath(), path);
+                if (found.isPresent()) {
+                    bom = merge(bom, artifact, key, path, found.get(), candidate.purl());
+                }
             }
         }
         if (manufacturer != null || supplier != null || componentManufacturer != null || time != null) {
@@ -252,21 +296,40 @@ public class JarMojo extends SbomMojo {
         return null;
     }
 
+    static boolean matchesGroup(String groupId, List<String> prefixes) {
+        if (groupId == null) {
+            return false;
+        }
+        for (String prefix : prefixes) {
+            if (prefix != null && !prefix.isBlank() && (groupId.equals(prefix) || groupId.startsWith(prefix + "."))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ObjectNode merge(ObjectNode bom, NestedSbom nested) throws MojoFailureException {
         String[] coordinates = nested.coordinates();
         Artifact host = project.getArtifacts().stream()
                 .filter(artifact -> artifact.getGroupId().equals(coordinates[0]) && artifact.getArtifactId().equals(coordinates[1]) && artifact.getFile() != null)
                 .findFirst()
                 .orElseThrow(() -> new MojoFailureException(nested.getLibrary() + " is not a dependency of " + project.getId()));
-        String path = nested.resourceOr("META-INF/sbom/" + coordinates[1] + ".cdx.json");
+        String path = nested.resourceOr(NestedSbom.defaultResource(coordinates[1]));
         JsonNode sbom = SbomFiles.readResource(host.getFile().toPath(), path);
-        int files = NestedFiles.check(host.getFile().toPath(), nested.getLibrary(), sbom);
-        if (files > 0) {
-            getLog().info("Checked the " + files + (files == 1 ? " file" : " files") + " that the SBOM of " + nested.getLibrary() + " places in the library");
-        }
-        getLog().info("Adding " + sbom.path("components").size() + " components from " + nested.getLibrary() + " (" + path + ")");
-        return SbomMerger.merge(bom, sbom, "pkg:maven/" + coordinates[0] + "/" + coordinates[1] + "@");
+        String hostPurl = MavenComponents.purl(host.getGroupId(), host.getArtifactId(), host.getBaseVersion(), host.getType(), host.getClassifier());
+        return merge(bom, host, nested.getLibrary(), path, sbom, hostPurl);
     }
+
+    private ObjectNode merge(ObjectNode bom, Artifact host, String libraryName, String path, JsonNode sbom, String hostPurl) {
+        int files = NestedFiles.check(host.getFile().toPath(), libraryName, sbom);
+        if (files > 0) {
+            getLog().info("Checked the " + files + (files == 1 ? " file" : " files") + " that the SBOM of " + libraryName + " places in the library");
+        }
+        getLog().info("Adding " + sbom.path("components").size() + " components from " + libraryName + " (" + path + ")");
+        return SbomMerger.merge(bom, sbom, hostPurl);
+    }
+
+    private record PackedArtifact(Artifact artifact, String purl) {}
 
     private void put(Path target, byte[] content) {
         Map<String, String> attributes = JarEntries.manifestAttribute(target, SPRING_BOOT_VERSION) == null ? Map.of()
