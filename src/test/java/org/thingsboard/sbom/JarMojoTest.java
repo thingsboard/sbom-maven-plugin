@@ -84,6 +84,17 @@ class JarMojoTest {
         }
     }
 
+    @Test
+    void nestedSbomAutoDiscoveryMatchesExactOrChildGroupsOnly() {
+        List<String> groups = List.of("org.thingsboard");
+        assertThat(JarMojo.matchesGroup("org.thingsboard", groups)).isTrue();
+        assertThat(JarMojo.matchesGroup("org.thingsboard.common", groups)).isTrue();
+        assertThat(JarMojo.matchesGroup("org.thingsboard.msa", groups)).isTrue();
+        assertThat(JarMojo.matchesGroup("org.thingsboard2", groups)).isFalse();
+        assertThat(JarMojo.matchesGroup("org.springframework.boot", groups)).isFalse();
+        assertThat(JarMojo.matchesGroup(null, groups)).isFalse();
+    }
+
     private Artifact artifact(String group, String name, String version, String classifier, String type) throws IOException {
         String extension = "pom".equals(type) ? "pom" : "jar";
         Artifact artifact = new DefaultArtifact(group, name, version, "compile", type, classifier, new DefaultArtifactHandler(extension));

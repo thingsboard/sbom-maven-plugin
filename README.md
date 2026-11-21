@@ -3,6 +3,7 @@
 Maven plugin that makes the CycloneDX SBOMs of what a Maven build ships:
 
 - `jar` makes the SBOM of a jar that packs its libraries, such as a Spring Boot jar, from the finished jar, and puts it into the jar.
+- `fonts` generates a nested SBOM from `.ttf`/`.otf` font files bundled inside a library's resources directory by reading their OpenType `name` tables.
 - `metadata` sets who makes and supplies the software and the SBOM, in an SBOM made by another tool.
 - `bundled` writes, before the packages are built, the SBOM of what each distribution package bundles besides the application: the components the build declares.
 - `package` writes one SBOM per distribution package (`.deb`, `.rpm`, `.zip`), next to the package file: the application SBOM and the bundled SBOM of the package.
@@ -57,6 +58,8 @@ The goal runs at `package` by default. Declare the plugin after the plugin that 
 | `otherJars` | | | Other jars of the project that get the same SBOM. One that does not exist is passed over |
 | `libraries` | | | Libraries that the packaging adds and that are not Maven dependencies of the project: `group` and `name`. The file in the jar is `<name>-<version>.jar`, where the version starts with a digit or is the `Implementation-Version` of the manifest of the library. Its pom comes from the repositories of the project |
 | `nestedSboms` | | | Packed libraries that carry the SBOM of what they bundle: `library` (`groupId:artifactId`), optional `resource` (path of the SBOM inside the library, `META-INF/sbom/<artifactId>.cdx.json` by default) and optional `skip` |
+| `autoDiscoverNestedSboms` | `sbom.jar.autoDiscoverNestedSboms` | `true` | Automatically fold in `META-INF/sbom/<artifactId>.cdx.json` from packed libraries whose `groupId` matches `nestedSbomGroups`. To opt a specific library out, list it in `nestedSboms` with `<skip>true</skip>` |
+| `nestedSbomGroups` | | `${project.groupId}` | Group prefixes eligible for `autoDiscoverNestedSboms` (matches exact group or `<prefix>.*`) |
 | `projectType` | `sbom.jar.projectType` | `application` | CycloneDX type of the component of the project |
 | `manufacturer`, `supplier`, `componentManufacturer` | | | As in the `metadata` goal |
 | `timestamp` | `sbom.jar.timestamp` | `${project.build.outputTimestamp}` | As in the `metadata` goal; the time the goal runs when it is not set |
@@ -81,6 +84,47 @@ A nested SBOM can place files in the library that carries it, such as the fonts 
 The SBOM is put into each jar at `resource`: an entry that is there is replaced, and one that is not is added at the end of the jar. A Spring Boot jar also gets `Sbom-Location` and `Sbom-Format` in its manifest, as Spring Boot sets them for an SBOM it finds when it packs the jar. Every other entry keeps its compressed bytes, time, attributes and place, and a launch script in front of an executable jar is kept.
 
 The build fails, and no jar is changed, when the jar does not exist or packs no libraries, a packed library is neither a dependency of the project nor declared, a packed library has other content than the file Maven resolved, two packed libraries are the same component, a declared library has no group, the pom of a library cannot be read, the library of a nested SBOM is not `groupId:artifactId` or not a dependency of the project, a nested SBOM is missing, places a file at a location that is not a file of the library, gives a hash of such a file that differs from the file or that is not one of MD5, SHA-1, SHA-256, SHA-512, SHA-384, SHA3-384, SHA3-256 or SHA3-512, is not CycloneDX 1.6, has a root without direct dependencies or lists its root as a component, a component of a nested SBOM clashes with a different component with the same bom-ref, an organization has no name, the timestamp is not a date and time with an offset, or the result fails schema validation.
+
+## fonts goal
+
+Generates a CycloneDX 1.6 SBOM for `.ttf` and `.otf` font files bundled inside a library's resources directory, reading family name, version, copyright and license metadata directly from each font's OpenType `name` table. Fonts with the same family, version, license and copyright are grouped into one component whose nested `file` components carry each font's path and hashes (so `jar` verifies them via `NestedFiles`). By default it writes `META-INF/sbom/<artifactId>.cdx.json` into `${project.build.outputDirectory}` at `process-classes`, so `maven-jar-plugin` packs it into the library jar and the `jar` goal folds it automatically into any application jar that packs that library.
+
+Embedded license metadata is automatically recognized for `OFL-1.1`, `OFL-1.0`, `Bitstream-Vera` (including DejaVu), `Apache-2.0`, `MIT`, `Ubuntu-font-1.0`, or any single-line SPDX expression. Fonts whose `name` table omits license information must be given an explicit SPDX override in `licenses`.
+
+```xml
+<plugin>
+    <groupId>org.thingsboard</groupId>
+    <artifactId>sbom-maven-plugin</artifactId>
+    <executions>
+        <execution>
+            <id>fonts-sbom</id>
+            <goals>
+                <goal>fonts</goal>
+            </goals>
+            <configuration>
+                <licenses>
+                    <fontLicense>
+                        <font>fonts/MaterialIcons-Regular.ttf</font>
+                        <license>Apache-2.0</license>
+                    </fontLicense>
+                </licenses>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+| Parameter | Property | Default | Description |
+| --- | --- | --- | --- |
+| `resourcesDirectory` | `sbom.fonts.resourcesDirectory` | `${project.build.outputDirectory}` | Root of resources packed into the jar (paths relative to this directory become `evidence.occurrences[].location`) |
+| `directory` | `sbom.fonts.directory` | `fonts` | Subdirectory under `resourcesDirectory` containing `.ttf`/`.otf` files (empty scans `resourcesDirectory`) |
+| `outputFile` | `sbom.fonts.outputFile` | `${project.build.outputDirectory}/META-INF/sbom/${project.artifactId}.cdx.json` | Where the font SBOM is written |
+| `licenses` | | none | Optional list of `<fontLicense>` overrides (`font`: relative path or family name; `license`: SPDX expression) |
+| `manufacturer`, `supplier`, `componentManufacturer` | | | As in the `metadata` goal |
+| `timestamp` | `sbom.fonts.timestamp` | `${project.build.outputTimestamp}` | Date and time with offset (`2026-01-31T12:00:00Z`) or seconds since 1970; omitted when unset or `1980-02-01T00:00:00Z` |
+| `skip` | `sbom.fonts.skip` | `false` | Skip the font SBOM |
+
+The build fails, and no file is written, when `resourcesDirectory` or `directory` does not exist, `directory` escapes `resourcesDirectory`, no `.ttf`/`.otf` files are found, a font file is not a valid TrueType/OpenType binary or lacks a family name, a font's license cannot be determined, a `licenses` override has a blank `font`/`license`, conflicts, or is not a valid SPDX expression, or the generated SBOM fails CycloneDX 1.6 schema validation.
 
 ## metadata goal
 

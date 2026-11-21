@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Copyright ThingsBoard, Inc.
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.example.it</groupId>
+        <artifactId>jar-fonts</artifactId>
+        <version>1.0</version>
+    </parent>
+    <groupId>org.example.it.common</groupId>
+    <artifactId>fonts-lib</artifactId>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>@project.groupId@</groupId>
+                <artifactId>@project.artifactId@</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>fonts-sbom</id>
+                        <goals>
+                            <goal>fonts</goal>
+                        </goals>
+                        <configuration>
+                            <licenses>
+                                <fontLicense>
+                                    <font>fonts/custom/Icons-Regular.ttf</font>
+                                    <license>Apache-2.0</license>
+                                </fontLicense>
+                            </licenses>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

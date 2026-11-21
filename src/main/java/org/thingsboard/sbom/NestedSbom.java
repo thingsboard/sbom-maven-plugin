@@ -49,6 +49,10 @@ public class NestedSbom {
         return coordinates;
     }
 
+    static String defaultResource(String artifactId) {
+        return "META-INF/sbom/" + artifactId + ".cdx.json";
+    }
+
     String resourceOr(String defaultResource) {
         return resource == null || resource.isBlank() ? defaultResource : resource;
     }
