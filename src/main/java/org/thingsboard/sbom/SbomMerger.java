@@ -30,6 +30,9 @@ public final class SbomMerger {
         SbomChecks.checkSameSpecVersion(target, nested);
         String hostRef = hostRefSupplier.get();
         String nestedRootRef = SbomChecks.checkNestedRoot(nested);
+        String targetRootRef = SbomChecks.rootRef(target);
+        SbomChecks.check(!SbomChecks.componentRefs(nested).contains(targetRootRef),
+                "Nested component " + targetRootRef + " conflicts with the target root component");
 
         ObjectNode merged = (ObjectNode) target.deepCopy();
         mergeComponents(merged, nested);

@@ -434,6 +434,19 @@ class SbomMergerTest {
     }
 
     @Test
+    void failsWhenNestedComponentCollidesWithTargetRootRef() {
+        ObjectNode target = Boms.bom("1.6", "app-root");
+        ObjectNode nested = Boms.bom("1.6", "fonts-root");
+        component(nested, "app-root", "pkg:generic/app-root@1.0");
+        dependency(nested, "fonts-root", "app-root");
+        dependency(nested, "app-root");
+
+        assertThatThrownBy(() -> SbomMerger.mergeIntoRoot(target, nested))
+                .isInstanceOf(SbomException.class)
+                .hasMessageContaining("Nested component app-root conflicts with the target root component");
+    }
+
+    @Test
     void failsWhenANestedComponentIsNotReachableFromTheNestedRoot() {
         ObjectNode nested = simpleNested();
         component(nested, "orphan", "pkg:npm/orphan@1.0.0");
