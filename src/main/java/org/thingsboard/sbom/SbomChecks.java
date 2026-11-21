@@ -76,8 +76,10 @@ final class SbomChecks {
         Set<String> expectedRefs = new HashSet<>(componentRefs(target));
         expectedRefs.addAll(componentRefs(nested));
         check(componentRefs(merged).equals(expectedRefs), "Merged SBOM components are not the union of the target and nested components");
-        check(!componentRefs(merged).contains(nestedRootRef) && !dependencyEntries(merged).containsKey(nestedRootRef),
-                "Merged SBOM still references the nested root " + nestedRootRef);
+        if (!nestedRootRef.equals(hostRef)) {
+            check(!componentRefs(merged).contains(nestedRootRef) && !dependencyEntries(merged).containsKey(nestedRootRef),
+                    "Merged SBOM still references the nested root " + nestedRootRef);
+        }
 
         Map<String, JsonNode> mergedDependencies = dependencyEntries(merged);
         Set<String> hostDependsOn = dependsOn(mergedDependencies.get(hostRef));

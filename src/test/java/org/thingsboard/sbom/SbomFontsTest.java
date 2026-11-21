@@ -152,6 +152,46 @@ class SbomFontsTest {
     }
 
     @Test
+    void mergesFontSbomIntoExistingRootSbomIdempotently() throws IOException {
+        Path resources = Files.createDirectories(dir.resolve("ui-resources"));
+        Path fontsDir = Files.createDirectories(resources.resolve("public/assets/fonts"));
+        byte[] segment7 = FontMetadataTest.syntheticTtf(Map.of(
+                0, "(c) Cedric Knight 2014. Licensed under SIL Open Font Licence v1.1.",
+                1, "Segment7",
+                5, "Version  "
+        ));
+        Files.write(fontsDir.resolve("Segment7Standard.otf"), segment7);
+
+        SbomFonts.Result fonts = SbomFonts.describe(
+                "org.thingsboard", "ui-ngx", "4.4.1-SNAPSHOT", null,
+                resources, "public/assets/fonts", Map.of("Segment7", "OFL-1.1"), false
+        );
+        JsonNode fontComponent = fonts.bom().path("components").get(0);
+        assertThat(fontComponent.path("name").asText()).isEqualTo("Segment7");
+        assertThat(fontComponent.has("version")).isFalse();
+        assertThat(fontComponent.path("purl").asText()).isEqualTo("pkg:generic/segment7");
+
+        ObjectNode uiBom = Boms.npmFixture().deepCopy();
+        String uiRootRef = uiBom.path("metadata").path("component").path("bom-ref").asText();
+        int initialComponents = uiBom.path("components").size();
+        int initialRootDeps = SbomChecks.dependencyGraph(uiBom).get(uiRootRef).size();
+
+        ObjectNode mergedOnce = SbomMerger.mergeIntoRoot(uiBom, fonts.bom());
+        assertThat(mergedOnce.path("components")).hasSize(initialComponents + 1);
+        assertThat(SbomChecks.dependencyGraph(mergedOnce).get(uiRootRef))
+                .hasSize(initialRootDeps + 1)
+                .contains(fontComponent.path("bom-ref").asText());
+        ObjectNode mergedTwice = SbomMerger.mergeIntoRoot(mergedOnce, fonts.bom());
+        assertThat(mergedTwice).isEqualTo(mergedOnce);
+
+        Path uiJar = dir.resolve("ui-ngx.jar");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(uiJar))) {
+            putEntry(zip, "public/assets/fonts/Segment7Standard.otf", segment7);
+        }
+        assertThat(NestedFiles.check(uiJar, "org.thingsboard:ui-ngx", mergedOnce)).isEqualTo(1);
+    }
+
+    @Test
     void rejectsEscapingFontDirectoryAndEmptyDirectory() throws IOException {
         Path classes = Files.createDirectories(dir.resolve("empty/fonts"));
         assertThatThrownBy(() -> SbomFonts.describe("org.example", "report", "1.0", null, classes.getParent(), "fonts", Map.of(), false))

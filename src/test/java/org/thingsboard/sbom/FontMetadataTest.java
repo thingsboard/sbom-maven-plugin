@@ -169,6 +169,16 @@ class FontMetadataTest {
     }
 
     @Test
+    void normalizesVersionStrings() {
+        assertThat(FontMetadata.normalizeVersion(null)).isEmpty();
+        assertThat(FontMetadata.normalizeVersion("   ")).isEmpty();
+        assertThat(FontMetadata.normalizeVersion("Version  ")).isEmpty();
+        assertThat(FontMetadata.normalizeVersion("Version Version 1.2")).isEqualTo("1.2");
+        assertThat(FontMetadata.normalizeVersion("Version 3.009; 2024")).isEqualTo("3.009");
+        assertThat(FontMetadata.normalizeVersion("VersionVersion")).isEqualTo("VersionVersion");
+    }
+
+    @Test
     void format1LanguageTagsDoNotMisclassifyAsWindowsEnglishOrUnicode() {
         int enUs = FontMetadata.priorityOf(FontMetadata.PLATFORM_WINDOWS, FontMetadata.ENCODING_WINDOWS_UNICODE_BMP, FontMetadata.LANGUAGE_WINDOWS_EN_US);
         int enGb = FontMetadata.priorityOf(FontMetadata.PLATFORM_WINDOWS, FontMetadata.ENCODING_WINDOWS_UNICODE_BMP, 0x0809);
@@ -281,9 +291,7 @@ class FontMetadataTest {
         List<int[]> encoded = new ArrayList<>();
         for (RawNameRecord rec : records) {
             byte[] bytes = rec.platformId == FontMetadata.PLATFORM_MACINTOSH
-                    ? rec.value.getBytes(java.nio.charset.Charset.isSupported("x-MacRoman")
-                            ? java.nio.charset.Charset.forName("x-MacRoman")
-                            : StandardCharsets.ISO_8859_1)
+                    ? rec.value.getBytes(FontMetadata.MAC_ROMAN)
                     : rec.value.getBytes(StandardCharsets.UTF_16BE);
             int off = strings.size();
             strings.writeBytes(bytes);

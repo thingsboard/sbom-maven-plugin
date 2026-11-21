@@ -10,16 +10,25 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public final class SbomMerger {
 
     private SbomMerger() {}
 
     public static ObjectNode merge(JsonNode target, JsonNode nested, String hostPurlPrefix) {
+        return mergeIntoHost(target, nested, () -> SbomChecks.findHostRef(target, hostPurlPrefix));
+    }
+
+    public static ObjectNode mergeIntoRoot(JsonNode target, JsonNode nested) {
+        return mergeIntoHost(target, nested, () -> SbomChecks.rootRef(target));
+    }
+
+    private static ObjectNode mergeIntoHost(JsonNode target, JsonNode nested, Supplier<String> hostRefSupplier) {
         SbomChecks.checkInput("Target", target);
         SbomChecks.checkInput("Nested", nested);
         SbomChecks.checkSameSpecVersion(target, nested);
-        String hostRef = SbomChecks.findHostRef(target, hostPurlPrefix);
+        String hostRef = hostRefSupplier.get();
         String nestedRootRef = SbomChecks.checkNestedRoot(nested);
 
         ObjectNode merged = (ObjectNode) target.deepCopy();
