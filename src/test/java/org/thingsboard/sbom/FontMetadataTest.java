@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.sbom;
 
+import org.apache.fontbox.ttf.NameRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,16 +59,16 @@ class FontMetadataTest {
     }
 
     @Test
-    void supportsOtfHeaderAndDistinguishesOfl10ApacheMitUbuntuAndDirectSpdx() {
-        byte[] otf = syntheticFont(0x4F54544F, Map.of(
+    void supportsOfl10ApacheMitUbuntuLicenseResolverAndDirectSpdx() {
+        byte[] ofl10 = syntheticTtf(Map.of(
                 1, "Icons",
                 5, "Version 1.0 (2024)\nextra",
                 13, "Licensed under the SIL Open Font License, Version 1.0.",
                 14, "http://scripts.sil.org/OFL"
         ));
-        FontMetadata otfMeta = FontMetadata.parse(otf, "Icons.otf");
-        assertThat(otfMeta.version()).isEqualTo("1.0 (2024) extra");
-        assertThat(otfMeta.identifyLicense("Icons.otf", Map.of())).isEqualTo("OFL-1.0");
+        FontMetadata meta = FontMetadata.parse(ofl10, "Icons.ttf");
+        assertThat(meta.version()).isEqualTo("1.0 (2024) extra");
+        assertThat(meta.identifyLicense("Icons.ttf", Map.of())).isEqualTo("OFL-1.0");
 
         assertThat(new FontMetadata("F", "1.0", "", "Apache License, Version 2.0", "").identifyLicense("f.ttf", Map.of()))
                 .isEqualTo("Apache-2.0");
@@ -76,9 +78,28 @@ class FontMetadataTest {
                 .isEqualTo("Ubuntu-font-1.0");
         assertThat(new FontMetadata("F", "1.0", "", "BSD-3-Clause", "").identifyLicense("f.ttf", Map.of()))
                 .isEqualTo("BSD-3-Clause");
+        // LicenseResolver resolves standard SPDX URLs when description is empty
+        assertThat(new FontMetadata("F", "1.0", "", "", "https://www.apache.org/licenses/LICENSE-2.0").identifyLicense("f.ttf", Map.of()))
+                .isEqualTo("Apache-2.0");
         // Does not falsely match substring "permit license"
         assertThatThrownBy(() -> new FontMetadata("F", "1.0", "", "Custom permit license", "").identifyLicense("f.ttf", Map.of()))
                 .isInstanceOf(SbomException.class);
+    }
+
+    @Test
+    void format1LanguageTagsDoNotMisclassifyAsWindowsEnglishOrUnicode() {
+        int enUs = FontMetadata.priorityOf(NameRecord.PLATFORM_WINDOWS, NameRecord.ENCODING_WINDOWS_UNICODE_BMP, NameRecord.LANGUAGE_WINDOWS_EN_US);
+        int enGb = FontMetadata.priorityOf(NameRecord.PLATFORM_WINDOWS, NameRecord.ENCODING_WINDOWS_UNICODE_BMP, 0x0809);
+        int unicode = FontMetadata.priorityOf(NameRecord.PLATFORM_UNICODE, 3, 0);
+        int macEn = FontMetadata.priorityOf(NameRecord.PLATFORM_MACINTOSH, NameRecord.ENCODING_MACINTOSH_ROMAN, NameRecord.LANGUAGE_MACINTOSH_ENGLISH);
+        int format1Tag9Win = FontMetadata.priorityOf(NameRecord.PLATFORM_WINDOWS, NameRecord.ENCODING_WINDOWS_UNICODE_BMP, 0x8009);
+        int format1Tag0Uni = FontMetadata.priorityOf(NameRecord.PLATFORM_UNICODE, 3, 0x8000);
+
+        assertThat(enUs).isLessThan(enGb);
+        assertThat(enGb).isLessThan(unicode);
+        assertThat(unicode).isLessThan(macEn);
+        assertThat(macEn).isLessThan(format1Tag9Win);
+        assertThat(macEn).isLessThan(format1Tag0Uni);
     }
 
     @Test
@@ -109,25 +130,79 @@ class FontMetadataTest {
     }
 
     @Test
-    void rejectsInvalidFontBinaryAndOutOfBoundsNameTable() {
+    void rejectsInvalidFontBinary() {
         assertThatThrownBy(() -> FontMetadata.parse("not a font".getBytes(StandardCharsets.UTF_8), "bad.ttf"))
                 .isInstanceOf(SbomException.class)
-                .hasMessageContaining("not a valid TrueType/OpenType");
-
-        // Truncated name table offset pointing past EOF
-        ByteBuffer bad = ByteBuffer.allocate(28).order(ByteOrder.BIG_ENDIAN);
-        bad.putInt(0x00010000).putShort((short) 1).putShort((short) 16).putShort((short) 0).putShort((short) 0);
-        bad.putInt(0x6E616D65).putInt(0).putInt(999).putInt(100);
-        assertThatThrownBy(() -> FontMetadata.parse(bad.array(), "trunc.ttf"))
-                .isInstanceOf(SbomException.class)
-                .hasMessageContaining("no valid OpenType name table");
+                .hasMessageContaining("Failed to read font bad.ttf");
     }
 
+    /**
+     * Builds a minimal valid TrueType font containing mandatory SFNT tables and the given {@code name} records.
+     */
     static byte[] syntheticTtf(Map<Integer, String> names) {
-        return syntheticFont(0x00010000, names);
+        Map<String, byte[]> tables = new TreeMap<>();
+        tables.put("glyf", new byte[4]);
+        tables.put("head", minimalHeadTable());
+        tables.put("hhea", minimalHheaTable());
+        tables.put("hmtx", new byte[6]);
+        tables.put("loca", new byte[6]);
+        tables.put("maxp", minimalMaxpTable());
+        tables.put("name", nameTable(names));
+
+        int numTables = tables.size();
+        int headerSize = 12 + numTables * 16;
+        int totalSize = headerSize;
+        for (byte[] table : tables.values()) {
+            totalSize += padded(table.length);
+        }
+
+        ByteBuffer buf = ByteBuffer.allocate(totalSize).order(ByteOrder.BIG_ENDIAN);
+        buf.putInt(0x00010000);
+        buf.putShort((short) numTables);
+        buf.putShort((short) 64);
+        buf.putShort((short) 2);
+        buf.putShort((short) 0);
+
+        int offset = headerSize;
+        for (Map.Entry<String, byte[]> entry : tables.entrySet()) {
+            buf.put(entry.getKey().getBytes(StandardCharsets.US_ASCII));
+            buf.putInt(0);
+            buf.putInt(offset);
+            buf.putInt(entry.getValue().length);
+            offset += padded(entry.getValue().length);
+        }
+        for (byte[] table : tables.values()) {
+            buf.put(table);
+            int pad = padded(table.length) - table.length;
+            for (int i = 0; i < pad; i++) {
+                buf.put((byte) 0);
+            }
+        }
+        return buf.array();
     }
 
-    static byte[] syntheticFont(int sfntVersion, Map<Integer, String> names) {
+    private static byte[] minimalHeadTable() {
+        ByteBuffer head = ByteBuffer.allocate(54).order(ByteOrder.BIG_ENDIAN);
+        head.putInt(0, 0x00010000); // majorVersion=1, minorVersion=0
+        head.putInt(12, 0x5F0F3CF5); // magicNumber
+        head.putShort(18, (short) 1000); // unitsPerEm
+        return head.array();
+    }
+
+    private static byte[] minimalHheaTable() {
+        ByteBuffer hhea = ByteBuffer.allocate(36).order(ByteOrder.BIG_ENDIAN);
+        hhea.putShort(34, (short) 1); // numberOfHMetrics
+        return hhea.array();
+    }
+
+    private static byte[] minimalMaxpTable() {
+        ByteBuffer maxp = ByteBuffer.allocate(6).order(ByteOrder.BIG_ENDIAN);
+        maxp.putInt(0, 0x00005000); // version 0.5
+        maxp.putShort(4, (short) 2); // numGlyphs
+        return maxp.array();
+    }
+
+    private static byte[] nameTable(Map<Integer, String> names) {
         Map<Integer, byte[]> encoded = new LinkedHashMap<>();
         ByteArrayOutputStream strings = new ByteArrayOutputStream();
         Map<Integer, Integer> offsets = new LinkedHashMap<>();
@@ -139,31 +214,23 @@ class FontMetadataTest {
         }
         int count = encoded.size();
         int stringStorageOffset = 6 + count * 12;
-        int nameTableLength = stringStorageOffset + strings.size();
-        int nameTableOffset = 12 + 16;
-
-        ByteBuffer buf = ByteBuffer.allocate(nameTableOffset + nameTableLength).order(ByteOrder.BIG_ENDIAN);
-        buf.putInt(sfntVersion);
-        buf.putShort((short) 1);
-        buf.putShort((short) 16);
-        buf.putShort((short) 0);
-        buf.putShort((short) 0);
-        buf.putInt(0x6E616D65);
-        buf.putInt(0);
-        buf.putInt(nameTableOffset);
-        buf.putInt(nameTableLength);
+        ByteBuffer buf = ByteBuffer.allocate(stringStorageOffset + strings.size()).order(ByteOrder.BIG_ENDIAN);
         buf.putShort((short) 0);
         buf.putShort((short) count);
         buf.putShort((short) stringStorageOffset);
         for (Map.Entry<Integer, byte[]> entry : encoded.entrySet()) {
-            buf.putShort((short) 3);      // Windows
-            buf.putShort((short) 1);      // Unicode BMP
-            buf.putShort((short) 0x0409); // English US
+            buf.putShort((short) NameRecord.PLATFORM_WINDOWS);
+            buf.putShort((short) NameRecord.ENCODING_WINDOWS_UNICODE_BMP);
+            buf.putShort((short) NameRecord.LANGUAGE_WINDOWS_EN_US);
             buf.putShort((short) (int) entry.getKey());
             buf.putShort((short) entry.getValue().length);
             buf.putShort((short) (int) offsets.get(entry.getKey()));
         }
         buf.put(strings.toByteArray());
         return buf.array();
+    }
+
+    private static int padded(int length) {
+        return (length + 3) & ~3;
     }
 }

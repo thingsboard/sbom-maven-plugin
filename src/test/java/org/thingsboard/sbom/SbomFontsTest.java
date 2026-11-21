@@ -92,20 +92,24 @@ class SbomFontsTest {
         }
         assertThat(NestedFiles.check(jar, "org.thingsboard.common:report", result.bom())).isEqualTo(3);
 
-        // Verify SbomMerger merges the font SBOM cleanly into an application SBOM
+        // Verify SbomMerger merges the font SBOM cleanly into an application SBOM, even when another classifier
+        // of the same groupId:artifactId is also packed (matching by exact host PURL).
         ObjectNode target = Boms.mavenFixture().deepCopy();
-        String hostPurl = "pkg:maven/org.thingsboard.common/report@4.4.1-SNAPSHOT?type=jar";
-        ObjectNode host = target.withArrayProperty("components").addObject();
-        host.put("type", "library").put("group", "org.thingsboard.common").put("name", "report")
-                .put("version", "4.4.1-SNAPSHOT").put("bom-ref", hostPurl).put("purl", hostPurl);
-        target.withArrayProperty("dependencies").addObject().put("ref", hostPurl);
+        String hostPurl = MavenComponents.purl("org.thingsboard.common", "report", "4.4.1-SNAPSHOT", "jar", null);
+        String otherClassifierPurl = MavenComponents.purl("org.thingsboard.common", "report", "4.4.1-SNAPSHOT", "jar", "extra");
+        for (String purl : new String[] {hostPurl, otherClassifierPurl}) {
+            ObjectNode comp = target.withArrayProperty("components").addObject();
+            comp.put("type", "library").put("group", "org.thingsboard.common").put("name", "report")
+                    .put("version", "4.4.1-SNAPSHOT").put("bom-ref", purl).put("purl", purl);
+            target.withArrayProperty("dependencies").addObject().put("ref", purl);
+        }
         String rootRef = target.path("metadata").path("component").path("bom-ref").asText();
         for (JsonNode dep : target.path("dependencies")) {
             if (rootRef.equals(dep.path("ref").asText())) {
-                ((ObjectNode) dep).withArrayProperty("dependsOn").add(hostPurl);
+                ((ObjectNode) dep).withArrayProperty("dependsOn").add(hostPurl).add(otherClassifierPurl);
             }
         }
-        ObjectNode merged = SbomMerger.merge(target, result.bom(), "pkg:maven/org.thingsboard.common/report@");
+        ObjectNode merged = SbomMerger.merge(target, result.bom(), hostPurl);
         assertThat(SbomChecks.componentRefs(merged)).contains(
                 components.get(0).path("bom-ref").asText(),
                 components.get(1).path("bom-ref").asText()
