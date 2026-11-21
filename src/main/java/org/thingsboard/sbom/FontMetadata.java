@@ -54,6 +54,10 @@ record FontMetadata(String family, String version, String copyright, String lice
     private static final int NAME_LICENSE_URL = 14;
     private static final int NAME_TYPOGRAPHIC_FAMILY = 16;
 
+    private static final Charset MAC_ROMAN = Charset.isSupported("x-MacRoman")
+            ? Charset.forName("x-MacRoman")
+            : StandardCharsets.ISO_8859_1;
+
     private static final Pattern VERSION_PREFIX = Pattern.compile("^(?:version\\s+)+", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern MIT_LICENSE_PHRASE = Pattern.compile("\\bthe mit license\\b|\\bmit license\\b");
@@ -183,7 +187,7 @@ record FontMetadata(String family, String version, String copyright, String lice
             return StandardCharsets.UTF_16BE;
         }
         if (platformId == PLATFORM_MACINTOSH && encodingId == ENCODING_MAC_ROMAN) {
-            return StandardCharsets.ISO_8859_1;
+            return MAC_ROMAN;
         }
         return null;
     }
@@ -237,8 +241,13 @@ record FontMetadata(String family, String version, String copyright, String lice
         }
 
         if (words.isEmpty() && !licenseUrl.isEmpty()) {
-            String normalizedUrl = licenseUrl.endsWith("/") ? licenseUrl.substring(0, licenseUrl.length() - 1) : licenseUrl;
-            String resolvedUrl = resolveSpdx(normalizedUrl);
+            String resolvedUrl = resolveSpdx(licenseUrl);
+            if (resolvedUrl == null) {
+                String altUrl = licenseUrl.endsWith("/")
+                        ? licenseUrl.substring(0, licenseUrl.length() - 1)
+                        : licenseUrl + "/";
+                resolvedUrl = resolveSpdx(altUrl);
+            }
             if (resolvedUrl != null) {
                 return resolvedUrl;
             }

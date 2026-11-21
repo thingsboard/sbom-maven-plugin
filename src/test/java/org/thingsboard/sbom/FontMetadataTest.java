@@ -114,6 +114,17 @@ class FontMetadataTest {
                 new RawNameRecord(FontMetadata.PLATFORM_MACINTOSH, FontMetadata.ENCODING_MAC_ROMAN, FontMetadata.LANGUAGE_MAC_ENGLISH, 1, "Mac Family")
         ), List.of("en-US"))));
         assertThat(FontMetadata.parse(macVsTag, "MacVsTag.ttf").family()).isEqualTo("Mac Family");
+
+        // MacRoman non-ASCII bytes (>= 0x80) decode cleanly rather than as ISO-8859-1 mojibake
+        byte[] macOnly = sfnt(0x00010000, Map.of("name", nameTableFormat0(List.of(
+                new RawNameRecord(FontMetadata.PLATFORM_MACINTOSH, FontMetadata.ENCODING_MAC_ROMAN,
+                        FontMetadata.LANGUAGE_MAC_ENGLISH, 0, "Copyright \u00A9 2024 Foundr\u00E9\u00AE"),
+                new RawNameRecord(FontMetadata.PLATFORM_MACINTOSH, FontMetadata.ENCODING_MAC_ROMAN,
+                        FontMetadata.LANGUAGE_MAC_ENGLISH, 1, "Caf\u00E9 Sans")
+        ))));
+        FontMetadata macMeta = FontMetadata.parse(macOnly, "CafeSans.ttf");
+        assertThat(macMeta.family()).isEqualTo("Caf\u00E9 Sans");
+        assertThat(macMeta.copyright()).isEqualTo("Copyright \u00A9 2024 Foundr\u00E9\u00AE");
     }
 
     @Test
@@ -147,6 +158,11 @@ class FontMetadataTest {
                 .isEqualTo("Apache-2.0");
         assertThat(new FontMetadata("F", "1.0", "", "", "https://opensource.org/license/MIT/").identifyLicense("f.ttf", Map.of()))
                 .isEqualTo("MIT");
+        // Preserves SPDX licenses whose canonical seeAlso URL ends with '/'
+        assertThat(new FontMetadata("F", "1.0", "", "", "https://www.mozilla.org/MPL/2.0/").identifyLicense("f.ttf", Map.of()))
+                .isEqualTo("MPL-2.0");
+        assertThat(new FontMetadata("F", "1.0", "", "", "https://www.mozilla.org/MPL/2.0").identifyLicense("f.ttf", Map.of()))
+                .isEqualTo("MPL-2.0");
         // Does not falsely match substring "permit license"
         assertThatThrownBy(() -> new FontMetadata("F", "1.0", "", "Custom permit license", "").identifyLicense("f.ttf", Map.of()))
                 .isInstanceOf(SbomException.class);
@@ -265,7 +281,9 @@ class FontMetadataTest {
         List<int[]> encoded = new ArrayList<>();
         for (RawNameRecord rec : records) {
             byte[] bytes = rec.platformId == FontMetadata.PLATFORM_MACINTOSH
-                    ? rec.value.getBytes(StandardCharsets.ISO_8859_1)
+                    ? rec.value.getBytes(java.nio.charset.Charset.isSupported("x-MacRoman")
+                            ? java.nio.charset.Charset.forName("x-MacRoman")
+                            : StandardCharsets.ISO_8859_1)
                     : rec.value.getBytes(StandardCharsets.UTF_16BE);
             int off = strings.size();
             strings.writeBytes(bytes);
